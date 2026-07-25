@@ -96,14 +96,37 @@ app.use((err, req, res, next) => {
 // Render's cached node_modules often skip postinstall, so we check at startup.
 // Runs in the background so the server can start immediately (non-blocking).
 const { exec } = require('child_process');
+const fs = require('fs');
+
+/**
+ * Ensures the Chrome binary is executable (fixes common EACCES issue on Render).
+ */
+function fixChromePermissions(chromePath) {
+  try {
+    if (chromePath && fs.existsSync(chromePath)) {
+      // Check if it's executable — if not, fix it
+      try {
+        fs.accessSync(chromePath, fs.constants.X_OK);
+      } catch (_) {
+        console.log('⚠ Chrome binary not executable — fixing permissions...');
+        fs.chmodSync(chromePath, 0o755);
+        console.log('✓ Chrome permissions fixed');
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fix Chrome permissions:', e.message);
+  }
+}
+
 async function ensureChromeInstalled() {
+  let chromePath = null;
   try {
     const puppeteer = require('puppeteer');
     // executablePath() is async in Puppeteer v25+ — must await
-    const chromePath = await puppeteer.executablePath();
-    const fs = require('fs');
+    chromePath = await puppeteer.executablePath();
     if (chromePath && fs.existsSync(chromePath)) {
-      console.log('✓ Chrome found at', chromePath);
+      fixChromePermissions(chromePath);
+      console.log('✓ Chrome ready at', chromePath);
       return;
     }
     console.log('⚠ Chrome binary missing at', chromePath);
@@ -122,6 +145,11 @@ async function ensureChromeInstalled() {
       return;
     }
     console.log('✓ Chrome installed successfully');
+    // Fix permissions after install (common EACCES issue on Render)
+    try {
+      const puppeteer = require('puppeteer');
+      puppeteer.executablePath().then(p => fixChromePermissions(p)).catch(() => {});
+    } catch (_) {}
   });
 }
 
