@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 
@@ -26,16 +27,36 @@ function fillTemplate(templatePath, data) {
 
 /**
  * Reads a QR image file and returns it as a base64 data URI.
+ * If the file doesn't exist (e.g., after Render restart), generates the QR
+ * on-the-fly from the UUID token so the PDF always has a valid QR code.
  * @param {string} qrAbsolutePath - Absolute path to QR PNG file.
- * @returns {string} - Base64-encoded PNG data URI.
+ * @param {string} qrToken - The UUID token to encode (fallback if file missing).
+ * @returns {Promise<string>} - Base64-encoded PNG data URI.
  */
-function getQRBase64(qrAbsolutePath) {
-  if (!qrAbsolutePath || !fs.existsSync(qrAbsolutePath)) {
-    // Return a placeholder transparent pixel
-    return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+async function getQRBase64(qrAbsolutePath, qrToken) {
+  if (qrAbsolutePath && fs.existsSync(qrAbsolutePath)) {
+    const imageBuffer = fs.readFileSync(qrAbsolutePath);
+    return imageBuffer.toString('base64');
   }
-  const imageBuffer = fs.readFileSync(qrAbsolutePath);
-  return imageBuffer.toString('base64');
+
+  // File not found — generate QR on-the-fly from the UUID
+  if (qrToken) {
+    try {
+      const buffer = await QRCode.toBuffer(qrToken, {
+        color: { dark: '#1a1a2e', light: '#ffffff' },
+        errorCorrectionLevel: 'H',
+        width: 600,
+        margin: 4,
+        type: 'png',
+      });
+      return buffer.toString('base64');
+    } catch (e) {
+      console.error('Failed to generate QR on the fly:', e.message);
+    }
+  }
+
+  // Ultimate fallback: transparent pixel
+  return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 }
 
 /**
@@ -76,8 +97,8 @@ function generateLogosHTML(eventLogoPath) {
 // Path to jsbarcode library (served locally, no CDN needed)
 const JSBARCODE_PATH = path.join(__dirname, '..', 'node_modules', 'jsbarcode', 'dist', 'JsBarcode.all.min.js');
 
-function renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath) {
-  const qrBase64 = getQRBase64(qrAbsolutePath);
+async function renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath) {
+  const qrBase64 = await getQRBase64(qrAbsolutePath, ticket.qr_token);
 
   const statusColors = { VALID: 'valid', USED: 'used', CANCELLED: 'cancelled' };
   const statusClass = statusColors[ticket.status] || 'valid';
@@ -129,7 +150,7 @@ async function generatePuppeteerPDF(ticket, qrPathOrUrl, eventLogoPath, settings
   }
 
   // Build HTML using shared render function
-  let html = renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath);
+  let html = await renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath);
 
   // Launch Puppeteer and generate PDF
   const browser = await puppeteer.launch({

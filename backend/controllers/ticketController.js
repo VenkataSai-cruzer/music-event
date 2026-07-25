@@ -83,7 +83,7 @@ async function previewTicket(req, res, next) {
 
     // Use the shared template renderer from the PDF generator
     const { renderTicketHTML } = require('../utils/generatePuppeteerPDF');
-    const html = renderTicketHTML(ticket, qrAbsolutePath, logoAbsolutePath);
+    const html = await renderTicketHTML(ticket, qrAbsolutePath, logoAbsolutePath);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
