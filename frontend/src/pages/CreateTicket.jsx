@@ -64,11 +64,33 @@ export default function CreateTicket() {
     }
   };
 
+  /** Read a blob from axios error response and parse the error message */
+  const extractErrorMsg = async (err) => {
+    try {
+      if (err.response?.data?.text) {
+        const text = await err.response.data.text();
+        const json = JSON.parse(text);
+        return json.error || json.message || 'Failed to download PDF';
+      }
+    } catch (_) {}
+    return err.message || 'Failed to download PDF';
+  };
+
   const handleDownload = async () => {
     if (!preview?.ticket_id) return;
     setDownloading(true);
     try {
       const res = await ticketService.download(preview.ticket_id);
+      // Check if response is actually an error (blob with error JSON)
+      if (res.data.type === 'application/json') {
+        const text = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsText(res.data);
+        });
+        const errData = JSON.parse(text);
+        throw new Error(errData.error || 'PDF generation failed');
+      }
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -79,7 +101,9 @@ export default function CreateTicket() {
       window.URL.revokeObjectURL(url);
       toast.success('PDF downloaded');
     } catch (err) {
-      toast.error('Failed to download PDF');
+      const msg = await extractErrorMsg(err);
+      toast.error(msg);
+      console.error('Download error:', msg);
     } finally {
       setDownloading(false);
     }
