@@ -273,13 +273,14 @@ async function generatePuppeteerPDF(ticket, qrPathOrUrl, eventLogoPath, settings
     });
 
     // Set content and wait for jsbarcode to render
+    // Increased timeout for cold start + premium template rendering
     await page.setContent(html, {
       waitUntil: ['load', 'networkidle0'],
-      timeout: 15000,
+      timeout: 45000,
     });
 
     // Wait for jsbarcode to render (no CDN needed - loaded locally)
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1500));
 
     // Generate PDF
     const fileName = `${ticket.qr_token}.pdf`;
