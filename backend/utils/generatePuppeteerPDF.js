@@ -3,6 +3,7 @@ const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 
+const ASSETS_DIR = path.join(__dirname, '..', 'public', 'assets');
 const TICKETS_DIR = path.join(__dirname, '..', 'public', 'tickets');
 const TEMPLATE_PATH = path.join(__dirname, '..', 'templates', 'ticket.html');
 
@@ -60,29 +61,48 @@ async function getQRBase64(qrAbsolutePath, qrToken) {
 }
 
 /**
- * Generates the logo-bar HTML for the ticket.
- * @param {string|null} eventLogoPath - Absolute path to event logo.
- * @returns {string} - HTML string for the logo bar.
+ * Reads an image file and returns a base64 data URI.
+ * Returns null if the file doesn't exist.
  */
-function generateLogosHTML(eventLogoPath) {
-  const logos = [];
-
-  // 7 NOTES logo
-  if (eventLogoPath && fs.existsSync(eventLogoPath)) {
-    const ext = path.extname(eventLogoPath).toLowerCase();
-    const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' : 'image/jpeg';
-    const data = fs.readFileSync(eventLogoPath).toString('base64');
-    logos.push(`<div class="logo-item"><img class="logo-img" src="data:${mime};base64,${data}" alt="7 NOTES" /></div>`);
-  } else {
-    logos.push(`<div class="logo-item"><span class="logo-text">7 NOTES</span></div>`);
+function readImageBase64(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'image/png';
+    const data = fs.readFileSync(filePath).toString('base64');
+    return `data:${mime};base64,${data}`;
+  } catch (e) {
+    console.error('Failed to read image:', e.message);
+    return null;
   }
+}
 
-  logos.push(`<div class="logo-sep"></div>`);
+/**
+ * Generates partner logos HTML from the assets directory.
+ * Falls back to styled text placeholders if files don't exist.
+ */
+function generatePartnerLogosHTML() {
+  const partners = [
+    { file: '7notes-logo.png', alt: '7 NOTES', label: '7 NOTES', short: '7N' },
+    { file: 'cafooze-logo.png', alt: 'CAFOOZE', label: 'CAFOOZE', short: 'CF' },
+    { file: 'ydm-logo.png', alt: 'Yours Digital Marketing', label: 'Yours Digital<br/>Marketing', short: 'YDM' },
+    { file: 'fisandy-logo.png', alt: 'Stories by Fisandy', label: 'Stories by<br/>Fisandy', short: 'FS' },
+  ];
 
-  // CAFOOZE logo (venue)
-  logos.push(`<div class="logo-item"><span class="logo-text" style="font-size:14px; opacity:0.5;">CAFOOZE</span></div>`);
-
-  return logos.join('\n');
+  return partners.map(p => {
+    const filePath = path.join(ASSETS_DIR, p.file);
+    const dataUri = readImageBase64(filePath);
+    if (dataUri) {
+      return `<div class="partner-item">
+        <div class="partner-icon"><img src="${dataUri}" alt="${p.alt}" /></div>
+        <span class="partner-label">${p.label}</span>
+      </div>`;
+    }
+    return `<div class="partner-item">
+      <div class="partner-icon">${p.short}</div>
+      <span class="partner-label">${p.label}</span>
+    </div>`;
+  }).join('\n');
 }
 
 /**
@@ -103,7 +123,7 @@ async function renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath) {
   const statusColors = { VALID: 'valid', USED: 'used', CANCELLED: 'cancelled' };
   const statusClass = statusColors[ticket.status] || 'valid';
   const statusLabel = ticket.status === 'VALID' ? 'VALID' : ticket.status;
-  const logosHTML = generateLogosHTML(eventLogoPath);
+  const partnerLogosHTML = generatePartnerLogosHTML();
 
   // Read and inline jsbarcode so it works in both Puppeteer (about:blank) and browser preview
   let jsbarcodeScript = '';
@@ -118,7 +138,7 @@ async function renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath) {
   const templateData = {
     STATUS_CLASS: statusClass,
     STATUS_LABEL: statusLabel,
-    LOGOS_HTML: logosHTML,
+    PARTNER_LOGOS_HTML: partnerLogosHTML,
     ATTENDEE_NAME: ticket.name || '',
     ATTENDEE_GENDER: ticket.gender || '',
     ATTENDEE_EMAIL: ticket.email || '',
