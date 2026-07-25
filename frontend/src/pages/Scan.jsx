@@ -20,10 +20,10 @@ export default function Scan() {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
-  const [scannerName, setScannerName] = useState('');
-  const [showNamePrompt, setShowNamePrompt] = useState(true);
+  const [showNamePrompt, setShowNamePrompt] = useState(
+    () => !sessionStorage.getItem('scannerToken')
+  );
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [loginMode, setLoginMode] = useState('name'); // 'name' or 'account'
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
@@ -110,17 +110,10 @@ export default function Scan() {
     };
   }, []);
 
-  // If scanner account logged in, auto-fill name
-  useEffect(() => {
-    if (scannerInfo && !scannerName) {
-      setScannerName(scannerInfo.display_name);
-    }
-  }, [scannerInfo, scannerName]);
-
-  // ── Determine effective scanned_by name ──
+  // ── Get scanner's display name from the authenticated scanner account ──
   const getScannedBy = useCallback(() => {
-    return scannerInfo?.display_name || scannerName || 'Unknown';
-  }, [scannerInfo, scannerName]);
+    return scannerInfo?.display_name || 'Unknown Scanner';
+  }, [scannerInfo]);
 
   // ── Atomic verify+approve handler ──
   const handleVerifyScan = useCallback(async (decodedText) => {
@@ -314,109 +307,74 @@ export default function Scan() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  SCANNER LOGIN / NAME PROMPT
+  //  SCANNER LOGIN (account-only — no free-text mode)
   // ═══════════════════════════════════════════════════════════════
   if (showNamePrompt) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-lg p-8">
-
-          {/* Tab toggle */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
-            <button
-              onClick={() => setLoginMode('name')}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
-                loginMode === 'name' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              👤 Quick Name
-            </button>
-            <button
-              onClick={() => setLoginMode('account')}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
-                loginMode === 'account' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              🔑 Scanner Login
-            </button>
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Scanner Login</h2>
+            <p className="text-sm text-gray-500">Sign in with your assigned scanner account</p>
           </div>
-
-          {loginMode === 'name' ? (
-            <>
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Enter Your Name</h2>
-                <p className="text-sm text-gray-500">This will be recorded as the scanner operator</p>
-              </div>
+          <div className="space-y-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Username</label>
               <input
                 type="text"
-                value={scannerName}
-                onChange={(e) => setScannerName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && scannerName.trim() && setShowNamePrompt(false)}
-                placeholder="e.g., John at Gate A"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all mb-4"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !loggingIn && handleScannerLogin()}
+                placeholder="e.g., gate_a"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                 autoFocus
               />
-              <button
-                onClick={() => scannerName.trim() && setShowNamePrompt(false)}
-                disabled={!scannerName.trim()}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all"
-              >
-                Start Scanning
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Scanner Login</h2>
-                <p className="text-sm text-gray-500">Use your scanner account credentials</p>
-              </div>
-              <div className="space-y-4 mb-4">
-                <input
-                  type="text"
-                  value={loginUsername}
-                  onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="Username (e.g., gate_a)"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                />
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleScannerLogin()}
-                  placeholder="Password"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                />
-              </div>
-              <button
-                onClick={handleScannerLogin}
-                disabled={loggingIn || !loginUsername.trim() || !loginPassword.trim()}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all"
-              >
-                {loggingIn ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Logging in...
-                  </span>
-                ) : 'Login & Start Scanning'}
-              </button>
-              <p className="text-xs text-gray-400 text-center mt-3">
-                Default accounts: gate_a, gate_b, vip / password: scan123
-              </p>
-            </>
-          )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Password</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !loggingIn && handleScannerLogin()}
+                placeholder="Enter password"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+              />
+            </div>
+          </div>
+          <button
+            onClick={handleScannerLogin}
+            disabled={loggingIn || !loginUsername.trim() || !loginPassword.trim()}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200"
+          >
+            {loggingIn ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Logging in...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2m0 0H8m0 0H6m6 0h4m-4 0H8m0 0v-2m0 2v2m0-2H6m6 0h4" />
+                </svg>
+                Login & Start Scanning
+              </span>
+            )}
+          </button>
+          <p className="text-xs text-gray-400 text-center mt-4">
+            Default accounts: gate_a, gate_b, vip / password: scan123
+          </p>
+          <p className="text-xs text-gray-400 text-center mt-1">
+            Ask the event organizer for your assigned scanner credentials
+          </p>
         </div>
       </div>
     );
