@@ -11,21 +11,25 @@ if (!fs.existsSync(QR_DIR)) {
 
 /**
  * Generates a QR code PNG containing ONLY the UUID (no personal data).
+ * Saves to filesystem for caching, returns the relative URL path.
  * @param {string} qrToken - The unique UUID to encode in the QR.
- * @returns {Promise<string>} - Resolves with the relative path of the saved QR image.
+ * @returns {Promise<string>} - Resolves with the relative URL path to the QR image.
  */
 async function generateQR(qrToken) {
   const fileName = `${qrToken}.png`;
   const filePath = path.join(QR_DIR, fileName);
 
-  await QRCode.toFile(filePath, qrToken, {
-    color: {
-      dark: '#1a1a2e',
-      light: '#ffffff',
-    },
-    width: 400,
-    margin: 2,
-  });
+  // Skip generation if already cached
+  if (!fs.existsSync(filePath)) {
+    await QRCode.toFile(filePath, qrToken, {
+      color: {
+        dark: '#1a1a2e',
+        light: '#ffffff',
+      },
+      width: 400,
+      margin: 2,
+    });
+  }
 
   return `/qrcodes/${fileName}`;
 }

@@ -12,10 +12,10 @@ if (!fs.existsSync(TICKETS_DIR)) {
 /**
  * Generates a professional A4 portrait PDF ticket.
  * @param {Object} ticket - Ticket details from the database.
- * @param {string} qrAbsolutePath - Absolute path to the QR code image.
+ * @param {string} qrPathOrUrl - QR image path (relative URL) or data URL.
  * @returns {Promise<string>} - Resolves with the relative URL path of the saved PDF.
  */
-function generatePDF(ticket, qrAbsolutePath) {
+function generatePDF(ticket, qrPathOrUrl) {
   return new Promise((resolve, reject) => {
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
@@ -206,6 +206,11 @@ function generatePDF(ticket, qrAbsolutePath) {
       .text('Scan QR code at entrance for verification', { align: 'center' });
 
     doc.moveDown(0.5);
+
+    // Resolve QR image path
+    const qrAbsolutePath = qrPathOrUrl
+      ? path.join(__dirname, '..', 'public', qrPathOrUrl.replace(/^\//, ''))
+      : null;
 
     if (qrAbsolutePath && fs.existsSync(qrAbsolutePath)) {
       const qrSize = 130;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter, FileDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ticketService } from '../services/ticketService';
 import Modal from '../components/Modal';
@@ -74,6 +74,23 @@ export default function Tickets() {
     }
   };
 
+  const handleExportCsv = async () => {
+    try {
+      const res = await ticketService.exportCsv();
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'tickets.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('CSV exported');
+    } catch (err) {
+      toast.error('Failed to export CSV');
+    }
+  };
+
   const handleRegeneratePDF = async (ticketId) => {
     try {
       await ticketService.regeneratePDF(ticketId);
@@ -95,9 +112,19 @@ export default function Tickets() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-        <p className="text-gray-500 mt-1">{data.pagination.total} total tickets</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
+          <p className="text-gray-500 mt-1">{data.pagination.total} total tickets</p>
+        </div>
+        <button
+          onClick={handleExportCsv}
+          className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+          title="Download all tickets as CSV"
+        >
+          <FileDown className="w-4 h-4" />
+          <span className="hidden sm:inline">Export CSV</span>
+        </button>
       </div>
 
       {/* Filters */}

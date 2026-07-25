@@ -10,12 +10,16 @@ const {
   useTicket,
   deleteTicket,
   regeneratePDF,
+  exportCsv,
 } = require('../controllers/ticketController');
 const { authenticateToken } = require('../middleware/auth');
 const { createTicketValidation } = require('../middleware/validate');
 
 // All ticket routes require authentication
 router.use(authenticateToken);
+
+// CSV export (must be before /:id route)
+router.get('/export/csv', exportCsv);
 
 // Dashboard stats
 router.get('/dashboard', getDashboard);

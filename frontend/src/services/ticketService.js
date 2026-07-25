@@ -18,5 +18,7 @@ export const ticketService = {
 
   delete: (ticketId) => api.delete(`/tickets/${ticketId}`),
 
+  exportCsv: () => api.get('/tickets/export/csv', { responseType: 'blob' }),
+
   regeneratePDF: (ticketId) => api.post(`/tickets/regenerate/${ticketId}`),
 };

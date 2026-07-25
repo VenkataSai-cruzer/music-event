@@ -9,6 +9,7 @@ const { createTables } = require('./db/init');
 
 const authRoutes = require('./routes/authRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,6 +52,7 @@ app.use('/tickets', express.static(path.join(__dirname, 'public', 'tickets')));
 // ── Routes ──
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ── Health Check ──
 app.get('/health', (req, res) => {

@@ -23,6 +23,30 @@ const createTables = async () => {
       );
     `);
 
+    // Event settings table (singleton row, id=1)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS event_settings (
+        id              INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        event_name      VARCHAR(255) NOT NULL DEFAULT 'Music Event',
+        event_logo      TEXT,
+        event_date      DATE,
+        event_time      VARCHAR(50),
+        venue_name      VARCHAR(255),
+        venue_address   TEXT,
+        organizer_name  VARCHAR(255),
+        contact_number  VARCHAR(20),
+        support_email   VARCHAR(255),
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // Insert default settings row if not exists
+    await pool.query(`
+      INSERT INTO event_settings (id)
+      VALUES (1)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
     console.log('Database tables initialized successfully');
   } catch (err) {
     console.error('Error initializing database tables:', err);

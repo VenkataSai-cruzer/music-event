@@ -6,34 +6,68 @@ const generatePDF = require('../utils/generatePDF');
 const path = require('path');
 
 /**
+ * Gets event_settings for use in ticket creation.
+ */
+async function getEventSettings() {
+  const result = await pool.query('SELECT * FROM event_settings WHERE id = 1');
+  return result.rows[0] || null;
+}
+
+/**
+ * Checks if a ticket with the same email or mobile already exists.
+ * Returns existing ticket if found.
+ */
+async function findDuplicate(email, mobile) {
+  const result = await pool.query(
+    `SELECT ticket_id, name, status FROM tickets
+     WHERE email = $1 OR mobile = $2
+     LIMIT 1`,
+    [email, mobile]
+  );
+  return result.rows[0] || null;
+}
+
+/**
  * Creates a new ticket with QR and PDF generation.
+ * Uses event_settings for event_date and event_address if not provided.
  */
 async function createTicket(ticketData) {
   const { name, gender, email, mobile, event_date, event_address } = ticketData;
+
+  // Resolve event details from settings if not provided
+  const settings = await getEventSettings();
+  const finalDate = event_date || (settings ? settings.event_date : null);
+  const finalAddress = event_address || (settings ? settings.venue_address || '' : '');
+
+  if (!finalDate) {
+    const err = new Error('Event date not configured. Please set it in Settings first.');
+    err.statusCode = 400;
+    throw err;
+  }
+
   const qrToken = uuidv4();
   const ticketId = await generateTicketId();
 
-  // Generate QR code (returns relative URL path)
-  const qrPath = await generateQR(qrToken);
+  // Generate QR code (PNG data buffer, no file storage)
+  const qrDataUrl = await generateQR(qrToken);
 
-  // Insert ticket into database
+  // Insert ticket into database (store qr_token only, no file paths)
   const result = await pool.query(
-    `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, event_date, event_address, status, qr_path)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'VALID', $9)
+    `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, event_date, event_address, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'VALID')
      RETURNING *`,
-    [ticketId, qrToken, name, gender, email, mobile, event_date, event_address, qrPath]
+    [ticketId, qrToken, name, gender, email, mobile, finalDate, finalAddress]
   );
 
   const ticket = result.rows[0];
 
-  // Generate PDF (needs absolute path to QR image)
-  const qrAbsolutePath = path.join(__dirname, '..', 'public', qrPath);
-  const pdfPath = await generatePDF(ticket, qrAbsolutePath);
+  // Generate PDF (returns buffer, saved to temp for response only)
+  const pdfRelativePath = await generatePDF(ticket, qrDataUrl);
 
-  // Update DB with PDF path
+  // Store the PDF path for download reference
   const updated = await pool.query(
     `UPDATE tickets SET pdf_path = $1 WHERE id = $2 RETURNING *`,
-    [pdfPath, ticket.id]
+    [pdfRelativePath, ticket.id]
   );
 
   return updated.rows[0];

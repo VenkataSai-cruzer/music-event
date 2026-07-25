@@ -4,10 +4,23 @@ const fs = require('fs');
 
 /**
  * POST /api/tickets
- * Creates a new ticket.
+ * Creates a new ticket with duplicate detection.
  */
 async function createTicket(req, res, next) {
   try {
+    const { name, gender, email, mobile } = req.body;
+
+    // Duplicate check
+    if (email || mobile) {
+      const existing = await ticketService.findDuplicate(email, mobile);
+      if (existing && !req.body.force) {
+        return res.status(409).json({
+          error: 'A ticket with this email or mobile already exists.',
+          duplicate: existing,
+        });
+      }
+    }
+
     const ticket = await ticketService.createTicket(req.body);
     return res.status(201).json({ message: 'Ticket created successfully', ticket });
   } catch (err) {
@@ -182,6 +195,45 @@ async function regeneratePDF(req, res, next) {
   }
 }
 
+/**
+ * GET /api/tickets/export/csv
+ * Exports all tickets as CSV for offline backup.
+ */
+async function exportCsv(req, res, next) {
+  try {
+    const result = await ticketService.getAllTickets({ limit: 100000 });
+    const tickets = result.tickets;
+
+    const headers = [
+      'Ticket ID', 'Name', 'Gender', 'Email', 'Mobile',
+      'Event Date', 'Event Address', 'Status',
+      'Created At', 'Scanned At', 'QR Token',
+    ];
+
+    const rows = tickets.map((t) => [
+      t.ticket_id,
+      `"${(t.name || '').replace(/"/g, '""')}"`,
+      t.gender,
+      t.email,
+      t.mobile,
+      t.event_date,
+      `"${(t.event_address || '').replace(/"/g, '""')}"`,
+      t.status,
+      t.created_at,
+      t.scanned_at || '',
+      t.qr_token,
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="tickets.csv"');
+    return res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createTicket,
   getAllTickets,
@@ -192,4 +244,5 @@ module.exports = {
   useTicket,
   deleteTicket,
   regeneratePDF,
+  exportCsv,
 };

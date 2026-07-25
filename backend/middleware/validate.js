@@ -15,7 +15,7 @@ function handleValidationErrors(req, res, next) {
 }
 
 /**
- * Validation rules for creating a ticket.
+ * Validation rules for creating a ticket (Date/Venue come from settings now).
  */
 const createTicketValidation = [
   body('name')
@@ -34,13 +34,6 @@ const createTicketValidation = [
     .trim()
     .notEmpty().withMessage('Mobile number is required')
     .matches(/^\+?[\d\s\-()]{7,20}$/).withMessage('Invalid mobile number format'),
-  body('event_date')
-    .trim()
-    .notEmpty().withMessage('Event date is required')
-    .isISO8601().withMessage('Invalid date format (use YYYY-MM-DD)'),
-  body('event_address')
-    .trim()
-    .notEmpty().withMessage('Event address is required'),
   handleValidationErrors,
 ];
 
