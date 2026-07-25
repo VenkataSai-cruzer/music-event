@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ASSETS_DIR = path.join(__dirname, '..', 'public', 'assets');
+const BRAND_DIR = path.join(ASSETS_DIR, 'brand');
 const TICKETS_DIR = path.join(__dirname, '..', 'public', 'tickets');
 const TEMPLATE_PATH = path.join(__dirname, '..', 'templates', 'ticket.html');
 
@@ -78,31 +79,109 @@ function readImageBase64(filePath) {
 }
 
 /**
- * Generates partner logos HTML from the assets directory.
- * Falls back to styled text placeholders if files don't exist.
+ * Logo filenames the code will search for in both assets/ and assets/brand/.
+ * Each array lists acceptable names for one partner, tried in order.
+ */
+const PARTNER_LOGO_FILES = [
+  ['7notes-logo.png', '7n-logo.png', '7n.png', '7notes.png'],
+  ['cafooze-logo.png', 'cf-logo.png', 'cf.png', 'cafooze.png'],
+  ['ydm-logo.png', 'yours-digital.png', 'ydm.png'],
+  ['fisandy-logo.png', 'fisandy.png', 'fs.png', 'stories-by-fisandy.png'],
+];
+
+const PARTNER_META = [
+  { alt: '7 NOTES', label: '7 NOTES', short: '7N' },
+  { alt: 'CAFOOZE', label: 'CAFOOZE', short: 'CF' },
+  { alt: 'Yours Digital Marketing', label: 'Yours Digital<br/>Marketing', short: 'YDM' },
+  { alt: 'Stories by Fisandy', label: 'Stories by<br/>Fisandy', short: 'FS' },
+];
+
+/**
+ * Tries to find a partner logo image in assets/ or assets/brand/.
+ * @param {string[]} filenames - List of acceptable filenames for this partner.
+ * @returns {string|null} - Base64 data URI or null.
+ */
+function findPartnerLogo(filenames) {
+  const searchDirs = [ASSETS_DIR];
+  if (fs.existsSync(BRAND_DIR)) searchDirs.push(BRAND_DIR);
+
+  for (const dir of searchDirs) {
+    for (const file of filenames) {
+      const filePath = path.join(dir, file);
+      const dataUri = readImageBase64(filePath);
+      if (dataUri) return dataUri;
+    }
+  }
+  return null;
+}
+
+/**
+ * Generates partner logos HTML from public/assets/ or public/assets/brand/.
+ * Scans in order:
+ *   1. Known filenames in assets/ or assets/brand/
+ *   2. If NONE of the known filenames are found, scans brand/ for any image
+ *      (catch-all for uploaded files with unexpected names)
+ *   3. Final fallback: styled text placeholders
  */
 function generatePartnerLogosHTML() {
-  const partners = [
-    { file: '7notes-logo.png', alt: '7 NOTES', label: '7 NOTES', short: '7N' },
-    { file: 'cafooze-logo.png', alt: 'CAFOOZE', label: 'CAFOOZE', short: 'CF' },
-    { file: 'ydm-logo.png', alt: 'Yours Digital Marketing', label: 'Yours Digital<br/>Marketing', short: 'YDM' },
-    { file: 'fisandy-logo.png', alt: 'Stories by Fisandy', label: 'Stories by<br/>Fisandy', short: 'FS' },
-  ];
-
-  return partners.map(p => {
-    const filePath = path.join(ASSETS_DIR, p.file);
-    const dataUri = readImageBase64(filePath);
+  // Phase 1: Try known filenames in assets/ and brand/
+  // For each partner: if logo found, use image; if not, use text placeholder
+  // This preserves all 4 partner slots regardless of which logos exist
+  let anyLogoFound = false;
+  const phase1Results = PARTNER_META.map((m, i) => {
+    const dataUri = findPartnerLogo(PARTNER_LOGO_FILES[i]);
     if (dataUri) {
+      anyLogoFound = true;
       return `<div class="partner-item">
-        <div class="partner-icon"><img src="${dataUri}" alt="${p.alt}" /></div>
-        <span class="partner-label">${p.label}</span>
+        <div class="partner-icon"><img src="${dataUri}" alt="${m.alt}" /></div>
+        <span class="partner-label">${m.label}</span>
       </div>`;
     }
     return `<div class="partner-item">
+      <div class="partner-icon">${m.short}</div>
+      <span class="partner-label">${m.label}</span>
+    </div>`;
+  });
+
+  if (anyLogoFound) {
+    return phase1Results.join('\n');
+  }
+
+  // Phase 2: Catch-all — scan brand/ for any image files
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.svg'];
+  try {
+    if (fs.existsSync(BRAND_DIR)) {
+      const brandImages = fs.readdirSync(BRAND_DIR)
+        .filter(f => imageExtensions.includes(path.extname(f).toLowerCase()))
+        .sort()
+        .slice(0, 6);
+
+      if (brandImages.length > 0) {
+        return brandImages.map(file => {
+          const filePath = path.join(BRAND_DIR, file);
+          const dataUri = readImageBase64(filePath);
+          if (dataUri) {
+            const alt = path.basename(file, path.extname(file)).replace(/[-_]/g, ' ');
+            return `<div class="partner-item">
+              <div class="partner-icon"><img src="${dataUri}" alt="${alt}" /></div>
+              <span class="partner-label" style="max-width:70px;">${alt}</span>
+            </div>`;
+          }
+          return '';
+        }).filter(Boolean).join('\n');
+      }
+    }
+  } catch (e) {
+    console.error('Failed to scan brand directory:', e.message);
+  }
+
+  // Phase 3: Ultimate fallback — styled text placeholders
+  return PARTNER_META.map(p =>
+    `<div class="partner-item">
       <div class="partner-icon">${p.short}</div>
       <span class="partner-label">${p.label}</span>
-    </div>`;
-  }).join('\n');
+    </div>`
+  ).join('\n');
 }
 
 /**
