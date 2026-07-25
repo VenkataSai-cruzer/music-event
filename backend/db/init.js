@@ -36,6 +36,7 @@ const createTables = async () => {
         organizer_name  VARCHAR(255),
         contact_number  VARCHAR(20),
         support_email   VARCHAR(255),
+        last_login_at   TIMESTAMPTZ,
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
@@ -45,6 +46,25 @@ const createTables = async () => {
       INSERT INTO event_settings (id)
       VALUES (1)
       ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Activity log for ticket timeline tracking
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id          SERIAL PRIMARY KEY,
+        ticket_id   VARCHAR(50) NOT NULL REFERENCES tickets(ticket_id) ON DELETE CASCADE,
+        event       VARCHAR(50) NOT NULL,
+        metadata    JSONB,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // Index for fast lookup
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_log_ticket_id ON activity_log(ticket_id);
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC);
     `);
 
     console.log('Database tables initialized successfully');

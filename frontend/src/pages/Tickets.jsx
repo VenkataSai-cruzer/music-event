@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter, FileDown } from 'lucide-react';
+import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter, FileDown, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ticketService } from '../services/ticketService';
 import Modal from '../components/Modal';
 import LoadingSpinner from '../components/LoadingSpinner';
+import TicketTimeline from '../components/TicketTimeline';
 
 export default function Tickets() {
   const [data, setData] = useState({ tickets: [], pagination: { total: 0, page: 1, totalPages: 1 } });
@@ -13,6 +14,7 @@ export default function Tickets() {
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [timelineTarget, setTimelineTarget] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -200,6 +202,13 @@ export default function Tickets() {
                             <Download className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => setTimelineTarget(ticket.ticket_id)}
+                            className="p-2 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors"
+                            title="View Activity Timeline"
+                          >
+                            <Clock className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleRegeneratePDF(ticket.ticket_id)}
                             className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
                             title="Regenerate PDF"
@@ -246,6 +255,15 @@ export default function Tickets() {
           </div>
         </>
       )}
+
+      {/* Timeline Modal */}
+      <Modal
+        open={!!timelineTarget}
+        onClose={() => setTimelineTarget(null)}
+        title={`Activity Timeline — ${timelineTarget || ''}`}
+      >
+        <TicketTimeline ticketId={timelineTarget} />
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal

@@ -18,6 +18,10 @@ export const ticketService = {
 
   delete: (ticketId) => api.delete(`/tickets/${ticketId}`),
 
+  getScanHistory: (page = 1) => api.get(`/tickets/scan-history?page=${page}`),
+
+  getTicketTimeline: (ticketId) => api.get(`/tickets/${ticketId}/timeline`),
+
   exportCsv: () => api.get('/tickets/export/csv', { responseType: 'blob' }),
 
   regeneratePDF: (ticketId) => api.post(`/tickets/regenerate/${ticketId}`),

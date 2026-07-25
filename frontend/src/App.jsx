@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
 import CreateTicket from './pages/CreateTicket';
 import Scan from './pages/Scan';
+import ScanHistory from './pages/ScanHistory';
 import Settings from './pages/Settings';
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/create" element={<CreateTicket />} />
           <Route path="scan" element={<Scan />} />
+          <Route path="scan-history" element={<ScanHistory />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

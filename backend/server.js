@@ -48,6 +48,7 @@ app.use(express.urlencoded({ extended: true }));
 // ── Static Files ──
 app.use('/qrcodes', express.static(path.join(__dirname, 'public', 'qrcodes')));
 app.use('/tickets', express.static(path.join(__dirname, 'public', 'tickets')));
+app.use('/logos', express.static(path.join(__dirname, 'public', 'logos')));
 
 // ── Routes ──
 app.use('/api/auth', authRoutes);

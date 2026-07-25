@@ -61,14 +61,22 @@ async function createTicket(ticketData) {
 
   const ticket = result.rows[0];
 
-  // Generate PDF (returns buffer, saved to temp for response only)
-  const pdfRelativePath = await generatePDF(ticket, qrDataUrl);
+  // Resolve event logo path if available
+  const logoAbsolutePath = settings?.event_logo
+    ? path.join(__dirname, '..', 'public', settings.event_logo.replace(/^\//, ''))
+    : null;
+
+  // Generate PDF with event logo (or fallback placeholder)
+  const pdfRelativePath = await generatePDF(ticket, qrDataUrl, logoAbsolutePath);
 
   // Store the PDF path for download reference
   const updated = await pool.query(
     `UPDATE tickets SET pdf_path = $1 WHERE id = $2 RETURNING *`,
     [pdfRelativePath, ticket.id]
   );
+
+  // Log activity
+  await logActivity(ticketId, 'created', { name, email });
 
   return updated.rows[0];
 }
@@ -168,13 +176,19 @@ async function useTicket(ticketId) {
     [ticketId]
   );
 
+  // Log activity
+  await logActivity(ticketId, 'entry_approved', { scanned_at: new Date().toISOString() });
+
   return result.rows[0];
 }
 
 /**
- * Deletes a ticket.
+ * Deletes a ticket. Logs cancellation before deletion (avoids FK cascade issue).
  */
 async function deleteTicket(ticketId) {
+  // Log cancellation before deleting (activity_log has ON DELETE CASCADE)
+  await logActivity(ticketId, 'cancelled').catch(() => {});
+
   const result = await pool.query(
     'DELETE FROM tickets WHERE ticket_id = $1 RETURNING *',
     [ticketId]
@@ -193,8 +207,14 @@ async function regeneratePDF(ticketId) {
     throw error;
   }
 
+  // Fetch settings for current logo
+  const settings = await getEventSettings();
+  const logoAbsolutePath = settings?.event_logo
+    ? path.join(__dirname, '..', 'public', settings.event_logo.replace(/^\//, ''))
+    : null;
+
   const qrAbsolutePath = path.join(__dirname, '..', 'public', ticket.qr_path);
-  const pdfPath = await generatePDF(ticket, qrAbsolutePath);
+  const pdfPath = await generatePDF(ticket, qrAbsolutePath, logoAbsolutePath);
 
   const updated = await pool.query(
     `UPDATE tickets SET pdf_path = $1, updated_at = NOW() WHERE ticket_id = $2 RETURNING *`,
@@ -205,7 +225,7 @@ async function regeneratePDF(ticketId) {
 }
 
 /**
- * Gets dashboard stats.
+ * Gets dashboard stats with event info, latest scan, last login, etc.
  */
 async function getDashboardStats() {
   const totalResult = await pool.query('SELECT COUNT(*) FROM tickets');
@@ -215,14 +235,34 @@ async function getDashboardStats() {
   const todayResult = await pool.query(
     "SELECT COUNT(*) FROM tickets WHERE DATE(created_at) = CURRENT_DATE"
   );
+  const todayScannedResult = await pool.query(
+    "SELECT COUNT(*) FROM tickets WHERE DATE(scanned_at) = CURRENT_DATE"
+  );
 
   const recentResult = await pool.query(
     'SELECT * FROM tickets ORDER BY created_at DESC LIMIT 5'
   );
 
+  // Latest scanned ticket
+  const latestScanResult = await pool.query(
+    `SELECT ticket_id, name, scanned_at FROM tickets
+     WHERE scanned_at IS NOT NULL
+     ORDER BY scanned_at DESC LIMIT 1`
+  );
+
+  // Latest generated ticket
+  const lastGeneratedResult = await pool.query(
+    'SELECT ticket_id, name, created_at FROM tickets ORDER BY created_at DESC LIMIT 1'
+  );
+
+  // Current event settings
+  const settingsResult = await pool.query('SELECT * FROM event_settings WHERE id = 1');
+  const settings = settingsResult.rows[0] || null;
+
+  // Activity log recent events
   const activityResult = await pool.query(
-    `SELECT ticket_id, name, status, updated_at FROM tickets
-     ORDER BY updated_at DESC LIMIT 10`
+    `SELECT ticket_id, event, created_at FROM activity_log
+     ORDER BY created_at DESC LIMIT 10`
   );
 
   return {
@@ -231,8 +271,74 @@ async function getDashboardStats() {
     used: parseInt(usedResult.rows[0].count, 10),
     cancelled: parseInt(cancelledResult.rows[0].count, 10),
     todayEntries: parseInt(todayResult.rows[0].count, 10),
+    todayScanned: parseInt(todayScannedResult.rows[0].count, 10),
     latestTickets: recentResult.rows,
+    latestScan: latestScanResult.rows[0] || null,
+    lastGenerated: lastGeneratedResult.rows[0] || null,
+    lastLoginAt: settings ? settings.last_login_at : null,
+    currentEvent: settings ? {
+      event_name: settings.event_name,
+      event_date: settings.event_date,
+      event_time: settings.event_time,
+      venue_name: settings.venue_name,
+    } : null,
     recentActivity: activityResult.rows,
+  };
+}
+
+/**
+ * Logs an activity event for a ticket.
+ */
+async function logActivity(ticketId, event, metadata = {}) {
+  await pool.query(
+    `INSERT INTO activity_log (ticket_id, event, metadata) VALUES ($1, $2, $3)`,
+    [ticketId, event, JSON.stringify(metadata)]
+  ).catch((err) => {
+    console.error('Failed to log activity:', err.message);
+  });
+}
+
+/**
+ * Gets activity timeline for a ticket.
+ */
+async function getTicketTimeline(ticketId) {
+  const result = await pool.query(
+    `SELECT event, metadata, created_at FROM activity_log
+     WHERE ticket_id = $1
+     ORDER BY created_at ASC`,
+    [ticketId]
+  );
+  return result.rows;
+}
+
+/**
+ * Gets scan history (all USED tickets with scan details).
+ */
+async function getScanHistory({ page = 1, limit = 30 }) {
+  const offset = (page - 1) * limit;
+
+  const countResult = await pool.query(
+    "SELECT COUNT(*) FROM tickets WHERE status = 'USED'"
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  const result = await pool.query(
+    `SELECT ticket_id, name, gender, status, scanned_at, updated_at
+     FROM tickets
+     WHERE status = 'USED'
+     ORDER BY scanned_at DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+
+  return {
+    scans: result.rows,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
   };
 }
 
@@ -246,4 +352,8 @@ module.exports = {
   deleteTicket,
   regeneratePDF,
   getDashboardStats,
+  getEventSettings,
+  logActivity,
+  getTicketTimeline,
+  getScanHistory,
 };

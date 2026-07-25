@@ -8,6 +8,11 @@ import {
   CalendarDays,
   ArrowRight,
   RefreshCw,
+  ScanLine,
+  UserCheck,
+  Music,
+  LogIn,
+  Activity,
 } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
 import StatCard from '../components/StatCard';
@@ -56,7 +61,7 @@ export default function Dashboard() {
     { icon: Ticket, label: 'Total Tickets', value: stats?.total, color: 'indigo' },
     { icon: CheckCircle, label: 'Valid Tickets', value: stats?.valid, color: 'green' },
     { icon: Clock, label: 'Used Tickets', value: stats?.used, color: 'amber' },
-    { icon: XCircle, label: 'Cancelled', value: stats?.cancelled, color: 'red' },
+    { icon: ScanLine, label: "Today's Scans", value: stats?.todayScanned, color: 'blue' },
     { icon: CalendarDays, label: "Today's Entries", value: stats?.todayEntries, color: 'purple' },
   ];
 
@@ -69,38 +74,46 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Event Info Bar */}
+      {stats?.currentEvent?.event_name && (
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-5 text-white">
+          <div className="flex items-center gap-3 mb-2">
+            <Music className="w-5 h-5" />
+            <span className="text-sm font-medium uppercase tracking-wider opacity-80">Current Event</span>
+          </div>
+          <h2 className="text-xl font-bold">{stats.currentEvent.event_name}</h2>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-sm text-white/80">
+            {stats.currentEvent.event_date && (
+              <span>📅 {new Date(stats.currentEvent.event_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            )}
+            {stats.currentEvent.event_time && <span>⏰ {stats.currentEvent.event_time}</span>}
+            {stats.currentEvent.venue_name && <span>📍 {stats.currentEvent.venue_name}</span>}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Latest Tickets */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900">Latest Tickets</h3>
-            <Link
-              to="/tickets"
-              className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-            >
+            <Link to="/tickets" className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
               View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
           <div className="space-y-3">
             {stats?.latestTickets?.length > 0 ? (
               stats.latestTickets.map((ticket) => (
-                <div
-                  key={ticket.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
+                <div key={ticket.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{ticket.name}</p>
                     <p className="text-xs text-gray-500">{ticket.ticket_id}</p>
                   </div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      ticket.status === 'VALID'
-                        ? 'bg-green-100 text-green-700'
-                        : ticket.status === 'USED'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    ticket.status === 'VALID' ? 'bg-green-100 text-green-700'
+                    : ticket.status === 'USED' ? 'bg-amber-100 text-amber-700'
+                    : 'bg-red-100 text-red-700'
+                  }`}>
                     {ticket.status}
                   </span>
                 </div>
@@ -111,29 +124,90 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            {stats?.recentActivity?.length > 0 ? (
-              stats.recentActivity.map((activity, idx) => (
-                <div
-                  key={`${activity.ticket_id}-${idx}`}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{activity.name}</p>
-                    <p className="text-xs text-gray-500">{activity.ticket_id}</p>
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(activity.updated_at).toLocaleTimeString()}
-                  </span>
-                </div>
-              ))
+        {/* Status Column */}
+        <div className="space-y-4">
+          {/* Latest Scan */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <ScanLine className="w-4 h-4 text-blue-500" />
+              Latest Scan
+            </div>
+            {stats?.latestScan ? (
+              <>
+                <p className="text-lg font-semibold text-gray-900">{stats.latestScan.name}</p>
+                <p className="text-xs text-gray-500">{stats.latestScan.ticket_id}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(stats.latestScan.scanned_at).toLocaleTimeString()}
+                </p>
+              </>
             ) : (
-              <p className="text-sm text-gray-400 text-center py-4">No recent activity</p>
+              <p className="text-sm text-gray-400">No scans yet</p>
             )}
           </div>
+
+          {/* Last Generated */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <UserCheck className="w-4 h-4 text-green-500" />
+              Last Generated
+            </div>
+            {stats?.lastGenerated ? (
+              <>
+                <p className="text-lg font-semibold text-gray-900">{stats.lastGenerated.name}</p>
+                <p className="text-xs text-gray-500">{stats.lastGenerated.ticket_id}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(stats.lastGenerated.created_at).toLocaleTimeString()}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-400">No tickets yet</p>
+            )}
+          </div>
+
+          {/* Last Login */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <LogIn className="w-4 h-4 text-purple-500" />
+              Last Login
+            </div>
+            {stats?.lastLoginAt ? (
+              <p className="text-sm text-gray-900">
+                {new Date(stats.lastLoginAt).toLocaleString()}
+              </p>
+            ) : (
+              <p className="text-sm text-gray-400">First login not recorded</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-4 h-4 text-indigo-500" />
+          <h3 className="font-semibold text-gray-900">Recent Activity</h3>
+        </div>
+        <div className="space-y-2">
+          {stats?.recentActivity?.length > 0 ? (
+            stats.recentActivity.map((act, idx) => (
+              <div key={idx} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg text-sm">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${
+                    act.event === 'created' ? 'bg-green-500'
+                    : act.event === 'entry_approved' ? 'bg-blue-500'
+                    : 'bg-gray-400'
+                  }`} />
+                  <span className="font-mono text-xs text-gray-500">{act.ticket_id}</span>
+                  <span className="text-gray-700">{act.event.replace(/_/g, ' ')}</span>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {new Date(act.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-4">No recent activity</p>
+          )}
         </div>
       </div>
     </div>

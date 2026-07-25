@@ -13,9 +13,10 @@ if (!fs.existsSync(TICKETS_DIR)) {
  * Generates a professional A4 portrait PDF ticket.
  * @param {Object} ticket - Ticket details from the database.
  * @param {string} qrPathOrUrl - QR image path (relative URL) or data URL.
+ * @param {string|null} [eventLogoPath] - Optional absolute path to event logo image.
  * @returns {Promise<string>} - Resolves with the relative URL path of the saved PDF.
  */
-function generatePDF(ticket, qrPathOrUrl) {
+function generatePDF(ticket, qrPathOrUrl, eventLogoPath) {
   return new Promise((resolve, reject) => {
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
@@ -43,18 +44,26 @@ function generatePDF(ticket, qrPathOrUrl) {
       .rect(0, doc.page.height - 12, doc.page.width, 12)
       .fill('#1a1a2e');
 
-    // ── Event Logo Placeholder ──
-    doc
-      .save()
-      .roundedRect(centerX - 30, 40, 60, 60, 8)
-      .fill('#e94560');
+    // ── Event Logo (uploaded image or fallback placeholder) ──
+    if (eventLogoPath && fs.existsSync(eventLogoPath)) {
+      doc.image(eventLogoPath, centerX - 30, 40, {
+        fit: [60, 60],
+        align: 'center',
+        valign: 'center',
+      });
+    } else {
+      doc
+        .save()
+        .roundedRect(centerX - 30, 40, 60, 60, 8)
+        .fill('#e94560');
 
-    doc
-      .fontSize(28)
-      .fillColor('#ffffff')
-      .text('♪', centerX - 10, 52, { width: 20, align: 'center' });
+      doc
+        .fontSize(28)
+        .fillColor('#ffffff')
+        .text('♪', centerX - 10, 52, { width: 20, align: 'center' });
 
-    doc.restore();
+      doc.restore();
+    }
 
     // ── Event Name ──
     doc

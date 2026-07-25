@@ -11,6 +11,8 @@ const {
   deleteTicket,
   regeneratePDF,
   exportCsv,
+  getScanHistory,
+  getTicketTimeline,
 } = require('../controllers/ticketController');
 const { authenticateToken } = require('../middleware/auth');
 const { createTicketValidation } = require('../middleware/validate');
@@ -20,6 +22,9 @@ router.use(authenticateToken);
 
 // CSV export (must be before /:id route)
 router.get('/export/csv', exportCsv);
+
+// Scan history
+router.get('/scan-history', getScanHistory);
 
 // Dashboard stats
 router.get('/dashboard', getDashboard);
@@ -38,6 +43,9 @@ router.put('/use/:ticketId', useTicket);
 
 // Download PDF
 router.get('/download/:ticketId', downloadTicket);
+
+// Timeline for a specific ticket (before /:id catch-all)
+router.get('/:ticketId/timeline', getTicketTimeline);
 
 // Regenerate PDF
 router.post('/regenerate/:ticketId', regeneratePDF);

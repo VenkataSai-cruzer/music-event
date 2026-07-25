@@ -96,6 +96,9 @@ async function downloadTicket(req, res, next) {
       return res.status(404).json({ error: 'PDF file not found. Try regenerating.' });
     }
 
+    // Log download activity
+    ticketService.logActivity(ticket.ticket_id, 'downloaded').catch(() => {});
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${ticket.ticket_id}.pdf"`);
     fs.createReadStream(pdfPath).pipe(res);
@@ -119,6 +122,9 @@ async function verifyTicket(req, res, next) {
     if (!ticket) {
       return res.status(404).json({ error: 'Invalid ticket', valid: false });
     }
+
+    // Log verification activity
+    ticketService.logActivity(ticket.ticket_id, 'verified').catch(() => {});
 
     return res.json({
       valid: true,
@@ -234,6 +240,35 @@ async function exportCsv(req, res, next) {
   }
 }
 
+/**
+ * GET /api/tickets/scan-history
+ * Returns paginated scan history.
+ */
+async function getScanHistory(req, res, next) {
+  try {
+    const { page } = req.query;
+    const result = await ticketService.getScanHistory({
+      page: parseInt(page, 10) || 1,
+    });
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/tickets/:ticketId/timeline
+ * Returns activity timeline for a ticket.
+ */
+async function getTicketTimeline(req, res, next) {
+  try {
+    const timeline = await ticketService.getTicketTimeline(req.params.ticketId);
+    return res.json(timeline);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createTicket,
   getAllTickets,
@@ -245,4 +280,6 @@ module.exports = {
   deleteTicket,
   regeneratePDF,
   exportCsv,
+  getScanHistory,
+  getTicketTimeline,
 };

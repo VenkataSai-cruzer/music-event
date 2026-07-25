@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Save, Settings as SettingsIcon } from 'lucide-react';
+import { Save, Settings as SettingsIcon, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { settingsService } from '../services/settingsService';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -17,6 +23,9 @@ export default function Settings() {
         const res = await settingsService.get();
         if (res.data && res.data.id) {
           reset(res.data);
+          if (res.data.event_logo) {
+            setLogoPreview(`${API_URL}${res.data.event_logo}`);
+          }
         }
       } catch (err) {
         toast.error('Failed to load settings');
@@ -27,10 +36,51 @@ export default function Settings() {
     fetchSettings();
   }, [reset]);
 
+  const handleLogoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (!allowed.includes(file.type)) {
+      toast.error('Only PNG, JPEG, WebP, and SVG images are allowed');
+      return;
+    }
+
+    // Validate size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be less than 5MB');
+      return;
+    }
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) return;
+    setUploading(true);
+    try {
+      const res = await settingsService.uploadLogo(logoFile);
+      setLogoPreview(`${API_URL}${res.data.logo_url}`);
+      setLogoFile(null);
+      toast.success('Logo uploaded');
+    } catch (err) {
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearLogo = () => {
+    setLogoPreview(null);
+    setLogoFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-      // Clean empty strings to null for optional fields
       const cleaned = Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, v === '' ? null : v])
       );
@@ -66,6 +116,65 @@ export default function Settings() {
       {/* Form */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Event Logo */}
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Event Logo</h2>
+            <div className="flex items-start gap-5">
+              {/* Preview */}
+              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden shrink-0 bg-gray-50">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Event Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <ImageIcon className="w-8 h-8 text-gray-300" />
+                )}
+              </div>
+
+              {/* Upload controls */}
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={handleLogoSelect}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <label
+                  htmlFor="logo-upload"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  Choose Image
+                </label>
+                <p className="text-xs text-gray-400">PNG, JPEG, WebP or SVG. Max 5MB.</p>
+
+                {logoFile && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleUploadLogo}
+                      disabled={uploading}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                    >
+                      {uploading ? (
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <><Upload className="w-3 h-3" /> Upload</>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearLogo}
+                      className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      <X className="w-3 h-3" /> Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Event Info */}
           <div>
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Event Information</h2>

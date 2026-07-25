@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const pool = require('../db/db');
 const { JWT_SECRET } = require('../middleware/auth');
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -30,6 +31,11 @@ async function login(req, res) {
     JWT_SECRET,
     { expiresIn: '24h' }
   );
+
+  // Record last login time in settings
+  await pool.query(
+    'UPDATE event_settings SET last_login_at = NOW() WHERE id = 1'
+  ).catch(() => {});
 
   return res.json({
     message: 'Login successful',
