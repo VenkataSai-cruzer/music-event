@@ -361,6 +361,7 @@ module.exports = {
   getAllTickets,
   getTicketById,
   getTicketByTicketId,
+  findDuplicate,
   verifyTicketByQrToken,
   useTicket,
   deleteTicket,
