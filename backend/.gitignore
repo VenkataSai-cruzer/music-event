@@ -1,0 +1,10 @@
+node_modules/
+.env
+dist/
+*.log
+public/tickets/*
+public/qrcodes/*
+public/logos/*
+!public/tickets/.gitkeep
+!public/qrcodes/.gitkeep
+!public/logos/.gitkeep
