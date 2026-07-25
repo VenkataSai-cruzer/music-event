@@ -99,71 +99,69 @@ const { exec } = require('child_process');
 const fs = require('fs');
 
 /**
- * Ensures the Chrome binary is executable (fixes common EACCES issue on Render).
+ * Installs Chrome in the background if it's not already available.
+ * Runs asynchronously after server start so it doesn't block.
  */
-function fixChromePermissions(chromePath) {
-  try {
-    if (chromePath && fs.existsSync(chromePath)) {
-      // Check if it's executable — if not, fix it
-      try {
-        fs.accessSync(chromePath, fs.constants.X_OK);
-      } catch (_) {
-        console.log('⚠ Chrome binary not executable — fixing permissions...');
-        fs.chmodSync(chromePath, 0o755);
-        console.log('✓ Chrome permissions fixed');
-      }
-    }
-  } catch (e) {
-    console.error('Failed to fix Chrome permissions:', e.message);
-  }
-}
-
 async function ensureChromeInstalled() {
-  let chromePath = null;
   try {
     const puppeteer = require('puppeteer');
-    // executablePath() is async in Puppeteer v25+ — must await
-    chromePath = await puppeteer.executablePath();
+    const chromePath = await puppeteer.executablePath();
     if (chromePath && fs.existsSync(chromePath)) {
-      fixChromePermissions(chromePath);
-      console.log('✓ Chrome ready at', chromePath);
-      return;
+      return; // Already installed
     }
-    console.log('⚠ Chrome binary missing at', chromePath);
-  } catch (e) {
-    console.log('⚠ Chrome not available:', e.message);
-  }
+  } catch (_) {}
 
-  // Install Chrome in the background (doesn't block server startup)
   console.log('⏳ Installing Chrome for Puppeteer (background)...');
   exec('npx --yes puppeteer browsers install chrome', {
-    timeout: 300000, // 5 minutes
-  }, (err, stdout, stderr) => {
+    timeout: 300000,
+  }, (err) => {
     if (err) {
       console.error('❌ Chrome install failed:', err.message);
-      console.log('PDF generation will be unavailable. Restart the service to retry.');
       return;
     }
-    console.log('✓ Chrome installed successfully');
-    // Fix permissions after install (common EACCES issue on Render)
-    try {
-      const puppeteer = require('puppeteer');
-      puppeteer.executablePath().then(p => fixChromePermissions(p)).catch(() => {});
-    } catch (_) {}
+    console.log('✓ Chrome installed');
   });
 }
 
-// ── Initialize DB & Start Server ──
+/**
+ * Ensures Chrome binary has execute permissions.
+ * Blocks server startup until done (critical for fixing EACCES before first request).
+ */
+async function ensureChromePermissions() {
+  try {
+    const puppeteer = require('puppeteer');
+    const chromePath = await puppeteer.executablePath();
+    if (!chromePath || !fs.existsSync(chromePath)) {
+      console.log('⚠ Chrome not installed yet — PDF generation will need background install');
+      return;
+    }
+    // Check if executable — if not, fix it synchronously
+    try {
+      fs.accessSync(chromePath, fs.constants.X_OK);
+      console.log('✓ Chrome ready');
+    } catch (_) {
+      console.log('⚠ Chrome not executable — fixing permissions...');
+      fs.chmodSync(chromePath, 0o755);
+      console.log('✓ Chrome permissions fixed');
+    }
+  } catch (e) {
+    console.log('⚠ Could not verify Chrome:', e.message);
+  }
+}
+
+// ── Initialize DB → Fix Chrome → Start Server ──
 createTables()
-  .then(() => {
-    // Start server immediately (non-blocking)
+  .then(async () => {
+    // Fix Chrome permission BEFORE any requests arrive (synchronous after await)
+    await ensureChromePermissions();
+    // Start server
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
-    // Install Chrome in background so the server is available right away
+    // Install in background if Chrome is still missing
     ensureChromeInstalled();
   })
   .catch((err) => {
-    console.error('Failed to initialize database:', err);
+    console.error('Failed to initialize:', err);
     process.exit(1);
   });
