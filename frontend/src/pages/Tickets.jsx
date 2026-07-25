@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter, FileDown, Clock } from 'lucide-react';
+import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter, FileDown, Clock, Printer, Mail, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ticketService } from '../services/ticketService';
 import Modal from '../components/Modal';
@@ -15,6 +15,10 @@ export default function Tickets() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [timelineTarget, setTimelineTarget] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -102,6 +106,58 @@ export default function Tickets() {
     }
   };
 
+  const handleBadge = async (ticketId) => {
+    try {
+      const res = await ticketService.generateBadge(ticketId);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `badge-${ticketId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Badge downloaded');
+    } catch (err) {
+      toast.error('Failed to generate badge');
+    }
+  };
+
+  const handleSendEmail = async (ticket) => {
+    if (!ticket.email) {
+      toast.error('No email address for this ticket');
+      return;
+    }
+    setSendingEmail(ticket.ticket_id);
+    try {
+      await ticketService.sendEmail(ticket.ticket_id);
+      toast.success(`Email sent to ${ticket.email}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send email');
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast.error('Please select a CSV file');
+      return;
+    }
+    setImporting(true);
+    try {
+      const res = await ticketService.bulkImport(importFile);
+      toast.success(res.data.message);
+      setImportOpen(false);
+      setImportFile(null);
+      fetchTickets();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const statusBadge = (status) => {
     const styles = {
       VALID: 'bg-green-100 text-green-700',
@@ -119,14 +175,24 @@ export default function Tickets() {
           <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
           <p className="text-gray-500 mt-1">{data.pagination.total} total tickets</p>
         </div>
-        <button
-          onClick={handleExportCsv}
-          className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-          title="Download all tickets as CSV"
-        >
-          <FileDown className="w-4 h-4" />
-          <span className="hidden sm:inline">Export CSV</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setImportOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            title="Import tickets from CSV"
+          >
+            <Upload className="w-4 h-4" />
+            <span className="hidden sm:inline">Import CSV</span>
+          </button>
+          <button
+            onClick={handleExportCsv}
+            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            title="Download all tickets as CSV"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -202,6 +268,20 @@ export default function Tickets() {
                             <Download className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleBadge(ticket.ticket_id)}
+                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors"
+                            title="Print Badge"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSendEmail(ticket)}
+                            className="p-2 rounded-lg hover:bg-sky-50 text-sky-600 transition-colors"
+                            title="Send Email"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => setTimelineTarget(ticket.ticket_id)}
                             className="p-2 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors"
                             title="View Activity Timeline"
@@ -255,6 +335,56 @@ export default function Tickets() {
           </div>
         </>
       )}
+
+      {/* Bulk Import Modal */}
+      <Modal
+        open={importOpen}
+        onClose={() => { setImportOpen(false); setImportFile(null); }}
+        title="Import Tickets from CSV"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Upload a CSV file with columns: <code className="bg-gray-100 px-1 rounded">name</code>,{' '}
+            <code className="bg-gray-100 px-1 rounded">email</code>,{' '}
+            <code className="bg-gray-100 px-1 rounded">gender</code>,{' '}
+            <code className="bg-gray-100 px-1 rounded">mobile</code>
+          </p>
+          <label className="block">
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 cursor-pointer transition-colors">
+              {importFile ? (
+                <p className="text-sm text-indigo-600 font-medium">{importFile.name}</p>
+              ) : (
+                <>
+                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Click to select CSV file</p>
+                  <p className="text-xs text-gray-400 mt-1">Max 500 rows, 5MB</p>
+                </>
+              )}
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setImportFile(e.target.files[0])}
+                className="hidden"
+              />
+            </div>
+          </label>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setImportOpen(false); setImportFile(null); }}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleImport}
+              disabled={!importFile || importing}
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Timeline Modal */}
       <Modal

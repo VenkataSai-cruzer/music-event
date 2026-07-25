@@ -13,6 +13,7 @@ import {
   Music,
   LogIn,
   Activity,
+  TrendingUp,
 } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
 import StatCard from '../components/StatCard';
@@ -178,6 +179,65 @@ export default function Dashboard() {
               <p className="text-sm text-gray-400">First login not recorded</p>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Usage Distribution */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-indigo-500" />
+            <h3 className="font-semibold text-gray-900">Usage Overview</h3>
+          </div>
+          <div className="space-y-3">
+            {[
+              { label: 'Used', value: stats?.used || 0, color: 'bg-amber-400', max: Math.max(stats?.total || 1, 1) },
+              { label: 'Valid', value: stats?.valid || 0, color: 'bg-green-400', max: Math.max(stats?.total || 1, 1) },
+              { label: 'Remaining', value: stats?.remaining || 0, color: 'bg-indigo-400', max: Math.max(stats?.total || 1, 1) },
+            ].map((bar) => (
+              <div key={bar.label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600">{bar.label}</span>
+                  <span className="font-medium text-gray-900">{bar.value}</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2.5">
+                  <div
+                    className={`${bar.color} h-2.5 rounded-full transition-all duration-500`}
+                    style={{ width: `${(bar.value / bar.max) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Hourly Entries */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="w-4 h-4 text-indigo-500" />
+            <h3 className="font-semibold text-gray-900">Hourly Entries (Last 12h)</h3>
+          </div>
+          {stats?.hourlyEntries?.length > 0 ? (
+            <div className="flex items-end gap-2 h-32">
+              {stats.hourlyEntries.map((h, i) => {
+                const maxCount = Math.max(...stats.hourlyEntries.map((x) => parseInt(x.count, 10)), 1);
+                const height = (parseInt(h.count, 10) / maxCount) * 100;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <span className="text-xs font-medium text-gray-700">{h.count}</span>
+                    <div
+                      className="w-full bg-indigo-500 rounded-t-md transition-all duration-500"
+                      style={{ height: `${height}%`, minHeight: '4px' }}
+                    />
+                    <span className="text-xs text-gray-400">{h.hour}:00</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-8">No entry data yet</p>
+          )}
         </div>
       </div>
 

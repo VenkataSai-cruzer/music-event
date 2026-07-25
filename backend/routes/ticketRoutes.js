@@ -13,15 +13,25 @@ const {
   exportCsv,
   getScanHistory,
   getTicketTimeline,
+  generateBadge,
+  bulkImport,
+  sendEmail,
 } = require('../controllers/ticketController');
 const { authenticateToken } = require('../middleware/auth');
 const { createTicketValidation } = require('../middleware/validate');
+const multer = require('multer');
 
 // All ticket routes require authentication
 router.use(authenticateToken);
 
+// Multer for CSV upload (memory storage)
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
 // CSV export (must be before /:id route)
 router.get('/export/csv', exportCsv);
+
+// Bulk import from CSV
+router.post('/bulk-import', csvUpload.single('file'), bulkImport);
 
 // Scan history
 router.get('/scan-history', getScanHistory);
@@ -43,6 +53,12 @@ router.put('/use/:ticketId', useTicket);
 
 // Download PDF
 router.get('/download/:ticketId', downloadTicket);
+
+// Generate badge
+router.post('/:ticketId/badge', generateBadge);
+
+// Send email
+router.post('/:ticketId/send-email', sendEmail);
 
 // Timeline for a specific ticket (before /:id catch-all)
 router.get('/:ticketId/timeline', getTicketTimeline);

@@ -269,6 +269,133 @@ async function getTicketTimeline(req, res, next) {
   }
 }
 
+/**
+ * POST /api/tickets/:ticketId/badge
+ * Generates a printable badge PDF.
+ */
+async function generateBadge(req, res, next) {
+  try {
+    const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    const settings = await ticketService.getEventSettings();
+    const logoAbsolutePath = settings?.event_logo
+      ? path.join(__dirname, '..', 'public', settings.event_logo.replace(/^\//, ''))
+      : null;
+
+    const generateBadgePDF = require('../utils/generateBadge');
+    const badgePath = await generateBadgePDF(ticket, ticket.qr_path, logoAbsolutePath);
+
+    const badgeAbsolutePath = path.join(__dirname, '..', 'public', badgePath.replace(/^\//, ''));
+    if (!fs.existsSync(badgeAbsolutePath)) {
+      return res.status(404).json({ error: 'Badge file not found' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="badge-${ticket.ticket_id}.pdf"`);
+    fs.createReadStream(badgeAbsolutePath).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/tickets/bulk-import
+ * Imports tickets from CSV file upload.
+ */
+async function bulkImport(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { parse } = require('csv-parse/sync');
+    const records = parse(req.file.buffer.toString(), {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    });
+
+    if (!records || records.length === 0) {
+      return res.status(400).json({ error: 'CSV file is empty or has no valid rows' });
+    }
+
+    if (records.length > 500) {
+      return res.status(400).json({ error: 'Maximum 500 tickets per import' });
+    }
+
+    const results = { success: 0, failed: 0, errors: [] };
+
+    for (const row of records) {
+      try {
+        const name = row.name || row.Name || row.NAME;
+        const gender = row.gender || row.Gender || row.GENDER || 'Other';
+        const email = row.email || row.Email || row.EMAIL;
+        const mobile = row.mobile || row.Mobile || row.MOBILE || '';
+
+        if (!name || !email) {
+          results.failed++;
+          results.errors.push({ row: row, error: 'Name and email are required' });
+          continue;
+        }
+
+        await ticketService.createTicket({
+          name,
+          gender: ['Male', 'Female', 'Other'].includes(gender) ? gender : 'Other',
+          email,
+          mobile: String(mobile || ''),
+        });
+
+        results.success++;
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ row: row, error: err.message });
+      }
+    }
+
+    return res.json({
+      message: `Import complete: ${results.success} created, ${results.failed} failed`,
+      results,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/tickets/:ticketId/send-email
+ * Sends the ticket PDF to the attendee's email.
+ */
+async function sendEmail(req, res, next) {
+  try {
+    const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    const pdfPath = ticket.pdf_path
+      ? path.join(__dirname, '..', 'public', ticket.pdf_path.replace(/^\//, ''))
+      : null;
+
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      return res.status(400).json({ error: 'PDF file not found. Please regenerate the ticket first.' });
+    }
+
+    const { sendTicketEmail } = require('../utils/sendEmail');
+    const result = await sendTicketEmail(ticket.email, ticket, pdfPath);
+
+    if (result.success) {
+      return res.json({ message: result.message });
+    } else {
+      return res.status(400).json({ error: result.message });
+    }
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createTicket,
   getAllTickets,
@@ -282,4 +409,7 @@ module.exports = {
   exportCsv,
   getScanHistory,
   getTicketTimeline,
+  generateBadge,
+  bulkImport,
+  sendEmail,
 };

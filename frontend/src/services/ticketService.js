@@ -25,4 +25,17 @@ export const ticketService = {
   exportCsv: () => api.get('/tickets/export/csv', { responseType: 'blob' }),
 
   regeneratePDF: (ticketId) => api.post(`/tickets/regenerate/${ticketId}`),
+
+  generateBadge: (ticketId) =>
+    api.post(`/tickets/${ticketId}/badge`, {}, { responseType: 'blob' }),
+
+  sendEmail: (ticketId) => api.post(`/tickets/${ticketId}/send-email`),
+
+  bulkImport: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/tickets/bulk-import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

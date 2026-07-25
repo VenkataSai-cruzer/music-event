@@ -48,15 +48,15 @@ async function createTicket(ticketData) {
   const qrToken = uuidv4();
   const ticketId = await generateTicketId();
 
-  // Generate QR code (PNG data buffer, no file storage)
-  const qrDataUrl = await generateQR(qrToken);
+  // Generate QR code (saves to public/qrcodes/{qrToken}.png)
+  const qrRelativePath = await generateQR(qrToken);
 
-  // Insert ticket into database (store qr_token only, no file paths)
+  // Insert ticket into database
   const result = await pool.query(
-    `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, event_date, event_address, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'VALID')
+    `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, event_date, event_address, status, qr_path)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'VALID', $9)
      RETURNING *`,
-    [ticketId, qrToken, name, gender, email, mobile, finalDate, finalAddress]
+    [ticketId, qrToken, name, gender, email, mobile, finalDate, finalAddress, qrRelativePath]
   );
 
   const ticket = result.rows[0];
@@ -67,7 +67,7 @@ async function createTicket(ticketData) {
     : null;
 
   // Generate PDF with event logo (or fallback placeholder)
-  const pdfRelativePath = await generatePDF(ticket, qrDataUrl, logoAbsolutePath);
+  const pdfRelativePath = await generatePDF(ticket, qrRelativePath, logoAbsolutePath);
 
   // Store the PDF path for download reference
   const updated = await pool.query(
@@ -225,7 +225,7 @@ async function regeneratePDF(ticketId) {
 }
 
 /**
- * Gets dashboard stats with event info, latest scan, last login, etc.
+ * Gets dashboard stats with event info, latest scan, last login, analytics, etc.
  */
 async function getDashboardStats() {
   const totalResult = await pool.query('SELECT COUNT(*) FROM tickets');
@@ -265,6 +265,18 @@ async function getDashboardStats() {
      ORDER BY created_at DESC LIMIT 10`
   );
 
+  // Hourly entries for analytics (last 12 hours)
+  const hourlyResult = await pool.query(`
+    SELECT
+      EXTRACT(HOUR FROM scanned_at) AS hour,
+      COUNT(*) AS count
+    FROM tickets
+    WHERE scanned_at IS NOT NULL
+      AND scanned_at >= NOW() - INTERVAL '12 hours'
+    GROUP BY EXTRACT(HOUR FROM scanned_at)
+    ORDER BY hour
+  `);
+
   return {
     total: parseInt(totalResult.rows[0].count, 10),
     valid: parseInt(validResult.rows[0].count, 10),
@@ -272,6 +284,7 @@ async function getDashboardStats() {
     cancelled: parseInt(cancelledResult.rows[0].count, 10),
     todayEntries: parseInt(todayResult.rows[0].count, 10),
     todayScanned: parseInt(todayScannedResult.rows[0].count, 10),
+    remaining: parseInt(totalResult.rows[0].count, 10) - parseInt(usedResult.rows[0].count, 10),
     latestTickets: recentResult.rows,
     latestScan: latestScanResult.rows[0] || null,
     lastGenerated: lastGeneratedResult.rows[0] || null,
@@ -283,6 +296,7 @@ async function getDashboardStats() {
       venue_name: settings.venue_name,
     } : null,
     recentActivity: activityResult.rows,
+    hourlyEntries: hourlyResult.rows,
   };
 }
 
