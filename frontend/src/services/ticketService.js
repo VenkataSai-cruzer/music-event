@@ -12,7 +12,7 @@ export const ticketService = {
   download: (ticketId) =>
     api.get(`/tickets/download/${ticketId}`, { responseType: 'blob' }),
 
-  verify: (qrToken) => api.post('/tickets/verify', { qr_token: qrToken }),
+  verify: (qrToken, scannedBy) => api.post('/tickets/verify', { qr_token: qrToken, scanned_by: scannedBy }),
 
   useTicket: (ticketId) => api.put(`/tickets/use/${ticketId}`),
 

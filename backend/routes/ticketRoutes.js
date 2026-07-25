@@ -1,79 +1,47 @@
 const express = require('express');
 const router = express.Router();
-const {
-  createTicket,
-  getAllTickets,
-  getDashboard,
-  getTicketById,
-  downloadTicket,
-  previewTicket,
-  verifyTicket,
-  useTicket,
-  deleteTicket,
-  regeneratePDF,
-  exportCsv,
-  getScanHistory,
-  getTicketTimeline,
-  generateBadge,
-  bulkImport,
-  sendEmail,
-} = require('../controllers/ticketController');
-const { authenticateToken } = require('../middleware/auth');
-const { createTicketValidation } = require('../middleware/validate');
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
-
-// Ticket preview (HTML version identical to PDF - no auth required for preview)
-router.get('/preview/:ticketId', previewTicket);
-
-// All ticket routes require authentication
-router.use(authenticateToken);
-
-// Multer for CSV upload (memory storage)
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-// CSV export (must be before /:id route)
-router.get('/export/csv', exportCsv);
+// ── Controller imports ──
+const {
+  createTicket, getAllTickets, getDashboard, getTicketById,
+  downloadTicket, useTicket,
+  deleteTicket, regeneratePDF, exportCsv, getScanHistory,
+  getTicketTimeline, generateBadge, bulkImport, sendEmail,
+} = require('../controllers/ticketController');
+const { createTicketValidation } = require('../middleware/validate');
 
-// Bulk import from CSV
-router.post('/bulk-import', csvUpload.single('file'), bulkImport);
+// ── Inline auth middleware (avoids module import side effects) ──
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
+function requireAuth(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
+  try {
+    req.admin = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token.' });
+  }
+}
 
-// Scan history
-router.get('/scan-history', getScanHistory);
-
-// Dashboard stats
-router.get('/dashboard', getDashboard);
-
-// Create a new ticket
-router.post('/', createTicketValidation, createTicket);
-
-// Get all tickets (with search, filter, pagination)
-router.get('/', getAllTickets);
-
-// Verify QR token (POST)
-router.post('/verify', verifyTicket);
-
-// Use/approve a ticket
-router.put('/use/:ticketId', useTicket);
-
-// Download PDF
-router.get('/download/:ticketId', downloadTicket);
-
-// Generate badge
-router.post('/:ticketId/badge', generateBadge);
-
-// Send email
-router.post('/:ticketId/send-email', sendEmail);
-
-// Timeline for a specific ticket (before /:id catch-all)
-router.get('/:ticketId/timeline', getTicketTimeline);
-
-// Regenerate PDF
-router.post('/regenerate/:ticketId', regeneratePDF);
-
-// Get single ticket
-router.get('/:id', getTicketById);
-
-// Delete ticket
-router.delete('/:ticketId', deleteTicket);
+// ── PROTECTED ROUTES (require auth) ──
+// Note: verify and preview are handled in server.js (app-level) to avoid Express 5 router ordering issues
+router.get('/export/csv', requireAuth, exportCsv);
+router.post('/bulk-import', requireAuth, csvUpload.single('file'), bulkImport);
+router.get('/scan-history', requireAuth, getScanHistory);
+router.get('/dashboard', requireAuth, getDashboard);
+router.post('/', requireAuth, createTicketValidation, createTicket);
+router.get('/', requireAuth, getAllTickets);
+router.put('/use/:ticketId', requireAuth, useTicket);
+router.get('/download/:ticketId', requireAuth, downloadTicket);
+router.post('/:ticketId/badge', requireAuth, generateBadge);
+router.post('/:ticketId/send-email', requireAuth, sendEmail);
+router.get('/:ticketId/timeline', requireAuth, getTicketTimeline);
+router.post('/regenerate/:ticketId', requireAuth, regeneratePDF);
+router.get('/:id', requireAuth, getTicketById);
+router.delete('/:ticketId', requireAuth, deleteTicket);
 
 module.exports = router;

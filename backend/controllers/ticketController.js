@@ -141,7 +141,10 @@ async function downloadTicket(req, res, next) {
 
 /**
  * POST /api/tickets/verify
- * Verifies a QR token (UUID) and returns ticket info.
+ * Atomic verify + approve endpoint.
+ * If ticket is VALID, atomically updates to USED with scanned_by and scanned_at.
+ * Scanner accounts log in separately via /api/auth/scanner-login.
+ * If called from admin (no scanner context), scanned_by can be passed in body.
  */
 async function verifyTicket(req, res, next) {
   try {
@@ -150,16 +153,61 @@ async function verifyTicket(req, res, next) {
       return res.status(400).json({ error: 'qr_token is required' });
     }
 
-    const ticket = await ticketService.verifyTicketByQrToken(qr_token);
-    if (!ticket) {
-      return res.status(404).json({ error: 'Invalid ticket', valid: false });
+    // Determine scanned_by from:
+    // 1. Scanner JWT token (role: scanner)
+    // 2. Or body.scanned_by (free-text for simple setups)
+    // 3. Or admin username from admin JWT
+    let scannedBy = req.body.scanned_by;
+    if (req.admin) {
+      if (req.admin.role === 'scanner') {
+        scannedBy = req.admin.display_name || req.admin.username;
+      } else if (req.admin.role === 'admin') {
+        scannedBy = scannedBy || req.admin.username;
+      }
     }
 
-    // Log verification activity
-    ticketService.logActivity(ticket.ticket_id, 'verified').catch(() => {});
+    const { ticket, action } = await ticketService.verifyAndApprove(qr_token, scannedBy);
 
+    if (!ticket) {
+      return res.status(404).json({
+        valid: false,
+        action: 'invalid',
+        error: 'Invalid ticket',
+      });
+    }
+
+    if (action === 'already_used') {
+      return res.json({
+        valid: false,
+        action: 'already_used',
+        ticket: {
+          ticket_id: ticket.ticket_id,
+          name: ticket.name,
+          status: ticket.status,
+          event_date: ticket.event_date,
+          event_address: ticket.event_address,
+          scanned_at: ticket.scanned_at,
+          scanned_by: ticket.scanned_by,
+        },
+      });
+    }
+
+    if (action === 'cancelled') {
+      return res.json({
+        valid: false,
+        action: 'cancelled',
+        ticket: {
+          ticket_id: ticket.ticket_id,
+          name: ticket.name,
+          status: ticket.status,
+        },
+      });
+    }
+
+    // Entry approved
     return res.json({
       valid: true,
+      action: 'approved',
       ticket: {
         ticket_id: ticket.ticket_id,
         name: ticket.name,
@@ -167,6 +215,7 @@ async function verifyTicket(req, res, next) {
         event_date: ticket.event_date,
         event_address: ticket.event_address,
         scanned_at: ticket.scanned_at,
+        scanned_by: ticket.scanned_by,
       },
     });
   } catch (err) {

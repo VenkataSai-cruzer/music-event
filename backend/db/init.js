@@ -18,10 +18,37 @@ const createTables = async () => {
         created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
         updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
         scanned_at    TIMESTAMPTZ,
+        scanned_by    VARCHAR(100),
         pdf_path      TEXT,
         qr_path       TEXT
       );
     `);
+
+    // Scanners table for gate/volunteer authentication
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scanners (
+        id            SERIAL PRIMARY KEY,
+        username      VARCHAR(50)   UNIQUE NOT NULL,
+        password_hash VARCHAR(255)  NOT NULL,
+        display_name  VARCHAR(100)  NOT NULL,
+        active        BOOLEAN       NOT NULL DEFAULT true,
+        created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // Seed default scanner accounts if table is empty
+    const scannerCount = await pool.query('SELECT COUNT(*) FROM scanners');
+    if (parseInt(scannerCount.rows[0].count, 10) === 0) {
+      const bcrypt = require('bcryptjs');
+      const hash = bcrypt.hashSync('scan123', 10);
+      await pool.query(`
+        INSERT INTO scanners (username, password_hash, display_name) VALUES
+        ($1, $2, 'Gate A - Main Entrance'),
+        ($3, $4, 'Gate B - Side Entrance'),
+        ($5, $6, 'VIP Entrance')
+      `, ['gate_a', hash, 'gate_b', hash, 'vip', hash]);
+      console.log('Seeded 3 default scanner accounts (gate_a, gate_b, vip / password: scan123)');
+    }
 
     // Event settings table (singleton row, id=1)
     await pool.query(`
@@ -70,6 +97,19 @@ const createTables = async () => {
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC);
+    `);
+
+    // ── Migrations for existing tables ──
+    // Add scanned_by column if not exists (tables may have been created before this migration)
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'tickets' AND column_name = 'scanned_by'
+        ) THEN
+          ALTER TABLE tickets ADD COLUMN scanned_by VARCHAR(100);
+        END IF;
+      END $$;
     `);
 
     console.log('Database tables initialized successfully');

@@ -81,7 +81,7 @@ function renderTicketHTML(ticket, qrAbsolutePath, eventLogoPath) {
 
   const statusColors = { VALID: 'valid', USED: 'used', CANCELLED: 'cancelled' };
   const statusClass = statusColors[ticket.status] || 'valid';
-  const statusLabel = ticket.status === 'VALID' ? 'VALID TICKET' : ticket.status;
+  const statusLabel = ticket.status === 'VALID' ? 'VALID' : ticket.status;
   const logosHTML = generateLogosHTML(eventLogoPath);
 
   // Read and inline jsbarcode so it works in both Puppeteer (about:blank) and browser preview
@@ -159,7 +159,7 @@ async function generatePuppeteerPDF(ticket, qrPathOrUrl, eventLogoPath, settings
     });
 
     // Wait for jsbarcode to render (no CDN needed - loaded locally)
-    await page.waitForTimeout(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     // Generate PDF
     const fileName = `${ticket.qr_token}.pdf`;

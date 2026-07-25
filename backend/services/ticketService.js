@@ -137,11 +137,52 @@ async function getTicketByTicketId(ticketId) {
 }
 
 /**
- * Verifies a QR token (UUID) and returns the ticket if valid.
+ * Verifies a QR token (UUID). If status is VALID, atomically approves entry.
+ * Returns { ticket, action: 'approved' | 'already_used' | 'cancelled' }.
  */
-async function verifyTicketByQrToken(qrToken) {
-  const result = await pool.query('SELECT * FROM tickets WHERE qr_token = $1', [qrToken]);
-  return result.rows[0] || null;
+async function verifyAndApprove(qrToken, scannedBy) {
+  // Find the ticket
+  const ticketResult = await pool.query('SELECT * FROM tickets WHERE qr_token = $1', [qrToken]);
+  const ticket = ticketResult.rows[0];
+
+  if (!ticket) {
+    return { ticket: null, action: 'invalid' };
+  }
+
+  if (ticket.status === 'USED') {
+    return { ticket, action: 'already_used' };
+  }
+
+  if (ticket.status === 'CANCELLED') {
+    return { ticket, action: 'cancelled' };
+  }
+
+  // Atomically approve entry (VALID → USED)
+  // Uses WHERE status='VALID' to prevent race conditions — if two scanners
+  // scan the same QR simultaneously, only one UPDATE will match.
+  const updateResult = await pool.query(
+    `UPDATE tickets SET status = 'USED', scanned_at = NOW(), scanned_by = $1, updated_at = NOW()
+     WHERE qr_token = $2 AND status = 'VALID'
+     RETURNING *`,
+    [scannedBy || null, qrToken]
+  );
+
+  // Handle race condition: UPDATE matched 0 rows (another scanner already approved)
+  if (updateResult.rows.length === 0) {
+    // Re-fetch the current state
+    const refreshed = await pool.query('SELECT * FROM tickets WHERE qr_token = $1', [qrToken]);
+    return { ticket: refreshed.rows[0] || ticket, action: 'already_used' };
+  }
+
+  const updated = updateResult.rows[0];
+
+  // Log activity
+  await logActivity(updated.ticket_id, 'entry_approved', {
+    scanned_by: scannedBy || null,
+    scanned_at: updated.scanned_at,
+  }).catch(() => {});
+
+  return { ticket: updated, action: 'approved' };
 }
 
 /**
@@ -249,7 +290,7 @@ async function getDashboardStats() {
 
   // Latest scanned ticket
   const latestScanResult = await pool.query(
-    `SELECT ticket_id, name, scanned_at FROM tickets
+    `SELECT ticket_id, name, scanned_at, scanned_by FROM tickets
      WHERE scanned_at IS NOT NULL
      ORDER BY scanned_at DESC LIMIT 1`
   );
@@ -341,7 +382,7 @@ async function getScanHistory({ page = 1, limit = 30 }) {
   const total = parseInt(countResult.rows[0].count, 10);
 
   const result = await pool.query(
-    `SELECT ticket_id, name, gender, status, scanned_at, updated_at
+    `SELECT ticket_id, name, gender, status, scanned_at, scanned_by, updated_at
      FROM tickets
      WHERE status = 'USED'
      ORDER BY scanned_at DESC
@@ -366,7 +407,7 @@ module.exports = {
   getTicketById,
   getTicketByTicketId,
   findDuplicate,
-  verifyTicketByQrToken,
+  verifyAndApprove,
   useTicket,
   deleteTicket,
   regeneratePDF,

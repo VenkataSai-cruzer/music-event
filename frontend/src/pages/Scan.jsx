@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import { ticketService } from '../services/ticketService';
-import { settingsService } from '../services/settingsService';
 
-// ── Icons (inline SVG for zero dependency on full-screen layout) ──
 const QR_SCANNER_ID = 'qr-scanner';
 const SCAN_COOLDOWN_MS = 5000;
-const RESULT_DISPLAY_MS = 2500;
+const RESULT_DISPLAY_MS = 3000;
 const POLL_INTERVAL_MS = 10000;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Scan() {
   const [scanning, setScanning] = useState(false);
@@ -23,12 +23,25 @@ export default function Scan() {
   const [scannerName, setScannerName] = useState('');
   const [showNamePrompt, setShowNamePrompt] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [loginMode, setLoginMode] = useState('name'); // 'name' or 'account'
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [scannerToken, setScannerToken] = useState(
+    () => sessionStorage.getItem('scannerToken') || null
+  );
+  const [scannerInfo, setScannerInfo] = useState(
+    () => {
+      const saved = sessionStorage.getItem('scannerInfo');
+      return saved ? JSON.parse(saved) : null;
+    }
+  );
 
   const scannerRef = useRef(null);
   const resumeTimerRef = useRef(null);
   const recentScansRef = useRef(new Map());
   const pollTimerRef = useRef(null);
-  const onScanSuccessRef = useRef(null); // Ref to prevent stale closures
+  const onScanSuccessRef = useRef(null);
 
   // ── Sound effects using Web Audio API ──
   const playSound = useCallback((type) => {
@@ -63,7 +76,6 @@ export default function Scan() {
     } catch (e) { /* silent fallback */ }
   }, [soundEnabled]);
 
-  // ── Trigger vibration ──
   const vibrate = useCallback((pattern) => {
     try { navigator.vibrate?.(pattern); } catch (e) { /* silent */ }
   }, []);
@@ -98,7 +110,53 @@ export default function Scan() {
     };
   }, []);
 
-  // Keep ref updated with latest onScanSuccess callback
+  // If scanner account logged in, auto-fill name
+  useEffect(() => {
+    if (scannerInfo && !scannerName) {
+      setScannerName(scannerInfo.display_name);
+    }
+  }, [scannerInfo, scannerName]);
+
+  // ── Determine effective scanned_by name ──
+  const getScannedBy = useCallback(() => {
+    return scannerInfo?.display_name || scannerName || 'Unknown';
+  }, [scannerInfo, scannerName]);
+
+  // ── Atomic verify+approve handler ──
+  const handleVerifyScan = useCallback(async (decodedText) => {
+    try {
+      const scannedBy = getScannedBy();
+      const res = await ticketService.verify(decodedText, scannedBy);
+      setResult(res.data);
+
+      const action = res.data.action;
+      if (action === 'approved') {
+        playSound('success');
+        vibrate(200);
+        toast.success('Entry approved!');
+        fetchCounter();
+      } else if (action === 'already_used') {
+        playSound('warn');
+        vibrate([100, 100, 100]);
+      } else {
+        playSound('error');
+        vibrate(300);
+      }
+    } catch (err) {
+      const data = err.response?.data;
+      setResult({
+        valid: false,
+        action: 'invalid',
+        error: data?.error || 'Invalid QR code',
+      });
+      playSound('error');
+      vibrate(300);
+    } finally {
+      setProcessing(false);
+    }
+  }, [playSound, vibrate, getScannedBy, fetchCounter]);
+
+  // Keep ref updated with latest callback
   useEffect(() => {
     onScanSuccessRef.current = (decodedText) => {
       const now = Date.now();
@@ -120,30 +178,6 @@ export default function Scan() {
     };
   });
 
-  const handleVerifyScan = useCallback(async (decodedText) => {
-    try {
-      const res = await ticketService.verify(decodedText);
-      setResult(res.data);
-      if (res.data.valid && res.data.ticket?.status === 'VALID') {
-        playSound('success');
-        vibrate(200);
-      } else if (res.data.ticket?.status === 'USED') {
-        playSound('warn');
-        vibrate([100, 100, 100]);
-      } else {
-        playSound('error');
-        vibrate(300);
-      }
-    } catch (err) {
-      const data = err.response?.data;
-      setResult({ valid: false, error: data?.error || 'Invalid QR code' });
-      playSound('error');
-      vibrate(300);
-    } finally {
-      setProcessing(false);
-    }
-  }, [playSound, vibrate]);
-
   // Auto-resume scanner after result display
   useEffect(() => {
     if (!result) return;
@@ -155,7 +189,7 @@ export default function Scan() {
     return () => {
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
     };
-  }, [result, searchMode, startScanner]);
+  }, [result, searchMode]);
 
   const startScanner = useCallback(async () => {
     setScanning(true);
@@ -199,45 +233,46 @@ export default function Scan() {
     setCameraReady(false);
   }, []);
 
-  // ── Auto-start scanner when name is provided ──
-  useEffect(() => {
-    if (!showNamePrompt && !scanning) {
-      startScanner();
-    }
-  }, [showNamePrompt, startScanner, scanning]);
-
-  const onScanSuccess = useCallback(async (decodedText) => {
-    onScanSuccessRef.current?.(decodedText);
-  }, []);
-
-  const handleApproveEntry = async (ticketId) => {
-    setProcessing(true);
-    try {
-      const res = await ticketService.useTicket(ticketId);
-      setResult((prev) => ({
-        ...prev,
-        ticket: { ...prev.ticket, ...res.data.ticket },
-      }));
-      playSound('success');
-      vibrate(200);
-      toast.success('Entry approved!');
-      fetchCounter();
-    } catch (err) {
-      const data = err.response?.data;
-      toast.error(data?.error || 'Failed to approve entry');
-      if (data?.ticket) {
-        setResult((prev) => ({ ...prev, ticket: { ...prev.ticket, ...data.ticket } }));
-      }
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   const handleDismissResult = useCallback(() => {
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
     setResult(null);
     if (!searchMode) startScanner();
   }, [searchMode, startScanner]);
+
+  // ── Scanner account login ──
+  const handleScannerLogin = async () => {
+    if (!loginUsername.trim() || !loginPassword.trim()) return;
+    setLoggingIn(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/scanner-login`, {
+        username: loginUsername,
+        password: loginPassword,
+      });
+      const { token, scanner } = res.data;
+      sessionStorage.setItem('scannerToken', token);
+      sessionStorage.setItem('scannerInfo', JSON.stringify(scanner));
+      setScannerToken(token);
+      setScannerInfo(scanner);
+      setScannerName(scanner.display_name);
+      setShowNamePrompt(false);
+      toast.success(`Logged in as ${scanner.display_name}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Scanner login failed');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  // ── Logout scanner ──
+  const handleLogout = () => {
+    sessionStorage.removeItem('scannerToken');
+    sessionStorage.removeItem('scannerInfo');
+    setScannerToken(null);
+    setScannerInfo(null);
+    setScannerName('');
+    setShowNamePrompt(true);
+    stopScanner();
+  };
 
   // ── Search During Scanning ──
   const handleSearch = async () => {
@@ -256,13 +291,16 @@ export default function Scan() {
   const handleSearchApprove = async (ticketId) => {
     setProcessing(true);
     try {
-      const res = await ticketService.useTicket(ticketId);
-      const ticket = searchResults.find((t) => t.ticket_id === ticketId);
-      if (ticket) {
-        setResult({ valid: true, ticket: { ...ticket, ...res.data.ticket } });
-        setSearchResults([]);
-        setSearchQuery('');
-        setSearchMode(false);
+      const scannedBy = getScannedBy();
+      // Find matching ticket from search results to get the QR token (UUID), not the human-readable ticket ID
+      const ticket = searchResults.find(t => t.ticket_id === ticketId);
+      const qrToken = ticket?.qr_token || ticketId;
+      const res = await ticketService.verify(qrToken, scannedBy);
+      setResult(res.data);
+      setSearchResults([]);
+      setSearchQuery('');
+      setSearchMode(false);
+      if (res.data.action === 'approved') {
         playSound('success');
         vibrate(200);
         toast.success('Entry approved!');
@@ -276,47 +314,123 @@ export default function Scan() {
   };
 
   // ═══════════════════════════════════════════════════════════════
-  //  SCANNER NAME PROMPT (first screen before scanning)
+  //  SCANNER LOGIN / NAME PROMPT
   // ═══════════════════════════════════════════════════════════════
   if (showNamePrompt) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2m0 0H8m0 0H6m6 0h4m-4 0H8m0 0v-2m0 2v2m0-2H6m6 0h4" />
-            </svg>
+      <div className="min-h-[80vh] flex items-center justify-center p-4">
+        <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-lg p-8">
+
+          {/* Tab toggle */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
+            <button
+              onClick={() => setLoginMode('name')}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+                loginMode === 'name' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              👤 Quick Name
+            </button>
+            <button
+              onClick={() => setLoginMode('account')}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
+                loginMode === 'account' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              🔑 Scanner Login
+            </button>
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Scanner Login</h2>
-          <p className="text-sm text-gray-500 mb-6">Enter your name to start scanning tickets</p>
-          <input
-            type="text"
-            value={scannerName}
-            onChange={(e) => setScannerName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && scannerName.trim() && setShowNamePrompt(false)}
-            placeholder="Your name (e.g., John at Gate A)"
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all mb-4"
-            autoFocus
-          />
-          <button
-            onClick={() => scannerName.trim() && setShowNamePrompt(false)}
-            disabled={!scannerName.trim()}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all"
-          >
-            Start Scanning
-          </button>
+
+          {loginMode === 'name' ? (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Enter Your Name</h2>
+                <p className="text-sm text-gray-500">This will be recorded as the scanner operator</p>
+              </div>
+              <input
+                type="text"
+                value={scannerName}
+                onChange={(e) => setScannerName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && scannerName.trim() && setShowNamePrompt(false)}
+                placeholder="e.g., John at Gate A"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all mb-4"
+                autoFocus
+              />
+              <button
+                onClick={() => scannerName.trim() && setShowNamePrompt(false)}
+                disabled={!scannerName.trim()}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all"
+              >
+                Start Scanning
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Scanner Login</h2>
+                <p className="text-sm text-gray-500">Use your scanner account credentials</p>
+              </div>
+              <div className="space-y-4 mb-4">
+                <input
+                  type="text"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  placeholder="Username (e.g., gate_a)"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                />
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleScannerLogin()}
+                  placeholder="Password"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                />
+              </div>
+              <button
+                onClick={handleScannerLogin}
+                disabled={loggingIn || !loginUsername.trim() || !loginPassword.trim()}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all"
+              >
+                {loggingIn ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Logging in...
+                  </span>
+                ) : 'Login & Start Scanning'}
+              </button>
+              <p className="text-xs text-gray-400 text-center mt-3">
+                Default accounts: gate_a, gate_b, vip / password: scan123
+              </p>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  RESULT SCREEN (overlay when ticket is scanned)
+  //  RESULT SCREEN (atomic verify result)
   // ═══════════════════════════════════════════════════════════════
   if (result) {
-    const isInvalid = result.valid === false;
-    const isUsed = result.ticket?.status === 'USED';
-    const isCancelled = result.ticket?.status === 'CANCELLED';
+    const action = result.action;
+    const isApproved = action === 'approved';
+    const isUsed = action === 'already_used';
+    const isCancelled = action === 'cancelled';
+    const isInvalid = action === 'invalid';
 
     let bgColor, icon, title, subtitle;
 
@@ -361,7 +475,6 @@ export default function Scan() {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in">
         <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl animate-in">
-          {/* Color header */}
           <div className={`bg-gradient-to-r ${bgColor} p-8 text-center`}>
             <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
               {icon}
@@ -370,9 +483,7 @@ export default function Scan() {
             <p className="text-sm text-white/80 mt-1">{subtitle}</p>
           </div>
 
-          {/* Details */}
           <div className="p-6 space-y-4">
-            {/* Ticket info card */}
             {result.ticket && (
               <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between text-sm">
@@ -399,20 +510,31 @@ export default function Scan() {
                     </span>
                   </div>
                 )}
-                {!isUsed && !isInvalid && !isCancelled && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500 font-medium">Time</span>
-                    <span className="text-gray-900">
-                      {new Date().toLocaleTimeString('en-US', {
-                        hour: '2-digit', minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                )}
-                {scannerName && (
+                {isUsed && result.ticket.scanned_by && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500 font-medium">Scanned By</span>
-                    <span className="text-gray-900">{scannerName}</span>
+                    <span className="text-gray-900">{result.ticket.scanned_by}</span>
+                  </div>
+                )}
+                {isApproved && (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 font-medium">Time</span>
+                      <span className="text-gray-900">
+                        {new Date().toLocaleTimeString('en-US', {
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 font-medium">Approved By</span>
+                      <span className="text-gray-900">{getScannedBy()}</span>
+                    </div>
+                  </>
+                )}
+                {result.ticket.status === 'USED' && (
+                  <div className="bg-amber-50 rounded-lg p-3 text-xs text-amber-700 text-center font-medium">
+                    🟡 Already scanned — no further action needed
                   </div>
                 )}
               </div>
@@ -424,22 +546,11 @@ export default function Scan() {
               </p>
             )}
 
-            {/* Approve button for VALID tickets */}
-            {result.valid && result.ticket?.status === 'VALID' && (
-              <button
-                onClick={() => handleApproveEntry(result.ticket.ticket_id)}
-                disabled={processing}
-                className="w-full py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 disabled:opacity-60 transition-all shadow-lg shadow-green-200"
-              >
-                {processing ? 'Approving...' : '✅  Approve Entry'}
-              </button>
-            )}
-
             <button
               onClick={handleDismissResult}
               className="w-full py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
             >
-              {!isInvalid && !isUsed && !isCancelled && !result.ticket?.status ? 'Dismiss' : 'Scan Next'}
+              Scan Next Ticket
             </button>
           </div>
         </div>
@@ -452,6 +563,20 @@ export default function Scan() {
   // ═══════════════════════════════════════════════════════════════
   return (
     <div className="max-w-lg mx-auto space-y-4">
+      {/* ── Scanner Info Bar ── */}
+      <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+          <span className="text-sm font-medium text-gray-700">Scanner: {getScannedBy()}</span>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+        >
+          Logout
+        </button>
+      </div>
+
       {/* ── Live Entry Counter ── */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
         <div className="flex items-center justify-between mb-2">
@@ -468,10 +593,10 @@ export default function Scan() {
             style={{ width: `${counter.total > 0 ? (counter.used / counter.total) * 100 : 0}%` }}
           />
         </div>
-        <p className="text-xs text-indigo-200 text-center mt-2">Updates every 10s</p>
+        <p className="text-xs text-indigo-200 text-center mt-2">Auto-updates every 10s</p>
       </div>
 
-      {/* ── Tab Toggle: Scan QR / Search ── */}
+      {/* ── Tab Toggle ── */}
       <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
         <button
           onClick={() => {
@@ -531,15 +656,7 @@ export default function Scan() {
               disabled={searching || !searchQuery.trim()}
               className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
             >
-              {searching ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Searching...
-                </span>
-              ) : 'Search'}
+              {searching ? 'Searching...' : 'Search'}
             </button>
 
             {searchResults.length > 0 && (
@@ -566,14 +683,9 @@ export default function Scan() {
                         {processing ? 'Processing...' : 'Approve Entry'}
                       </button>
                     )}
-                    {ticket.status === 'USED' && (
-                      <div className="bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700 text-center">
-                        Already scanned: {ticket.scanned_at ? new Date(ticket.scanned_at).toLocaleString() : 'Unknown'}
-                      </div>
-                    )}
-                    {ticket.status === 'CANCELLED' && (
-                      <div className="bg-red-50 rounded-lg px-3 py-2 text-xs text-red-700 text-center">
-                        This ticket has been cancelled
+                    {ticket.scanned_by && (
+                      <div className="text-xs text-gray-400 text-center">
+                        Scanned by: {ticket.scanned_by}
                       </div>
                     )}
                   </div>
@@ -596,9 +708,7 @@ export default function Scan() {
       {/* ── Scan Tab ── */}
       {!searchMode && (
         <>
-          {/* Scanner box */}
           <div className="bg-gray-900 rounded-2xl overflow-hidden shadow-lg relative">
-            {/* Scanner frame area */}
             <div className="relative aspect-square">
               <div id={QR_SCANNER_ID} className={`w-full h-full ${scanning ? '' : 'flex items-center justify-center bg-gray-900'}`}>
                 {!scanning && (
@@ -611,20 +721,16 @@ export default function Scan() {
                 )}
               </div>
 
-              {/* Scanner overlay animation */}
               {cameraReady && scanning && (
                 <div className="absolute inset-0 pointer-events-none">
-                  {/* Corner brackets */}
                   <div className="absolute top-4 left-4 w-10 h-10 border-t-3 border-l-3 border-indigo-400 rounded-tl-lg" />
                   <div className="absolute top-4 right-4 w-10 h-10 border-t-3 border-r-3 border-indigo-400 rounded-tr-lg" />
                   <div className="absolute bottom-4 left-4 w-10 h-10 border-b-3 border-l-3 border-indigo-400 rounded-bl-lg" />
                   <div className="absolute bottom-4 right-4 w-10 h-10 border-b-3 border-r-3 border-indigo-400 rounded-br-lg" />
-                  {/* Scanning line animation */}
                   <div className="absolute left-6 right-6 h-0.5 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-scan" />
                 </div>
               )}
 
-              {/* Processing overlay */}
               {processing && (
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                   <div className="text-center">
@@ -632,13 +738,12 @@ export default function Scan() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    <p className="text-white text-sm">Verifying...</p>
+                    <p className="text-white text-sm">Verifying & Approving...</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Controls bar */}
             <div className="p-4 bg-gray-900 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className={`w-2.5 h-2.5 rounded-full ${cameraReady ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
@@ -675,10 +780,8 @@ export default function Scan() {
             </div>
           </div>
 
-          {/* Scanner info */}
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{scannerName && `Scanner: ${scannerName}`}</span>
-            <span>Continuous scan mode</span>
+          <div className="text-xs text-gray-500 text-center">
+            ✓ Atomic verify & approve — one scan approves entry
           </div>
         </>
       )}
@@ -701,13 +804,9 @@ export default function Scan() {
             <li>Click <strong>Approve Entry</strong> to mark them as entered</li>
             <li>When internet returns, all approvals will sync automatically</li>
           </ol>
-          <p className="mt-2 text-xs text-amber-600">
-            ⚠️ Note: The Search & Approve flow still requires an active internet connection. If completely offline, use the CSV as a reference to verify attendees manually by matching their name and ID.
-          </p>
         </div>
       </details>
 
-      {/* CSS for scan line animation */}
       <style>{`
         @keyframes scanLine {
           0%, 100% { top: 10%; }

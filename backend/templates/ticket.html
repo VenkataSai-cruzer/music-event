@@ -120,18 +120,19 @@
   }
 
   .status-badge {
-    padding: 6px 18px;
-    border-radius: 20px;
+    padding: 4px 14px;
+    border-radius: 14px;
     font-family: 'Arial', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
     white-space: nowrap;
+    opacity: 0.85;
   }
-  .status-badge.valid { background: #22c55e; color: #fff; }
-  .status-badge.used { background: #f59e0b; color: #fff; }
-  .status-badge.cancelled { background: #ef4444; color: #fff; }
+  .status-badge.valid { border: 1px solid rgba(34, 197, 94, 0.4); color: #22c55e; background: rgba(34, 197, 94, 0.08); }
+  .status-badge.used { border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+  .status-badge.cancelled { border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.08); }
 
   .divider {
     width: 100%;
@@ -255,11 +256,11 @@
     gap: 4px;
   }
   .qr-area img {
-    width: 200px;
-    height: 200px;
-    border-radius: 12px;
+    width: 250px;
+    height: 250px;
+    border-radius: 16px;
     background: #fff;
-    padding: 10px;
+    padding: 12px;
   }
   .qr-label {
     font-family: 'Arial', sans-serif;
@@ -270,18 +271,30 @@
     font-weight: 600;
   }
 
+  .security-note {
+    font-family: 'Arial', sans-serif;
+    font-size: 6px;
+    color: rgba(255, 255, 255, 0.2);
+    text-align: center;
+    margin-top: 4px;
+    padding: 0 10px;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+  }
+
   .barcode-area {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
+    min-width: 0;
   }
   .barcode-area svg {
     max-width: 100%;
-    height: 42px;
+    height: 46px;
     background: #fff;
-    padding: 4px 8px;
+    padding: 6px 12px;
     border-radius: 6px;
   }
   .barcode-label {
@@ -484,6 +497,7 @@
       <div class="qr-area">
         <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR Code" />
         <span class="qr-label">Scan at Entry</span>
+        <div class="security-note">This ticket will be validated electronically at the venue.<br/>QR code is valid for one-time entry only.</div>
       </div>
       <div class="barcode-area">
         <svg id="barcode"></svg>
