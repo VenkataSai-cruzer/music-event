@@ -15,6 +15,9 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ── Trust proxy (before rate limiter — Render sits behind a proxy) ──
+app.set('trust proxy', 1);
+
 // ── Security Middleware (applied to ALL routes including public ones) ──
 app.use(helmet());
 app.use(cors({
@@ -89,12 +92,48 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ── Ensure Chrome is installed for Puppeteer PDF generation ──
+// Render's cached node_modules often skip postinstall, so we check at startup.
+// Runs in the background so the server can start immediately (non-blocking).
+const { exec } = require('child_process');
+async function ensureChromeInstalled() {
+  try {
+    const puppeteer = require('puppeteer');
+    // executablePath() is async in Puppeteer v25+ — must await
+    const chromePath = await puppeteer.executablePath();
+    const fs = require('fs');
+    if (chromePath && fs.existsSync(chromePath)) {
+      console.log('✓ Chrome found at', chromePath);
+      return;
+    }
+    console.log('⚠ Chrome binary missing at', chromePath);
+  } catch (e) {
+    console.log('⚠ Chrome not available:', e.message);
+  }
+
+  // Install Chrome in the background (doesn't block server startup)
+  console.log('⏳ Installing Chrome for Puppeteer (background)...');
+  exec('npx --yes puppeteer browsers install chrome', {
+    timeout: 300000, // 5 minutes
+  }, (err, stdout, stderr) => {
+    if (err) {
+      console.error('❌ Chrome install failed:', err.message);
+      console.log('PDF generation will be unavailable. Restart the service to retry.');
+      return;
+    }
+    console.log('✓ Chrome installed successfully');
+  });
+}
+
 // ── Initialize DB & Start Server ──
 createTables()
   .then(() => {
+    // Start server immediately (non-blocking)
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
+    // Install Chrome in background so the server is available right away
+    ensureChromeInstalled();
   })
   .catch((err) => {
     console.error('Failed to initialize database:', err);
