@@ -111,6 +111,7 @@ async function getTicketById(req, res, next) {
 /**
  * GET /api/tickets/download/:ticketId
  * Streams the PDF file for download.
+ * If the PDF file doesn't exist (e.g., after Render restart), auto-regenerates it.
  * ticketId is the ME-2026-000001 format.
  */
 async function downloadTicket(req, res, next) {
@@ -120,12 +121,24 @@ async function downloadTicket(req, res, next) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const pdfPath = ticket.pdf_path
+    let pdfPath = ticket.pdf_path
       ? path.join(__dirname, '..', 'public', ticket.pdf_path.replace(/^\//, ''))
       : null;
 
+    // Auto-regenerate if file is missing (handles Render's ephemeral filesystem)
     if (!pdfPath || !fs.existsSync(pdfPath)) {
-      return res.status(404).json({ error: 'PDF file not found. Try regenerating.' });
+      try {
+        const updatedTicket = await ticketService.regeneratePDF(ticket.ticket_id);
+        pdfPath = updatedTicket.pdf_path
+          ? path.join(__dirname, '..', 'public', updatedTicket.pdf_path.replace(/^\//, ''))
+          : null;
+      } catch (regErr) {
+        return res.status(500).json({ error: 'Failed to regenerate PDF: ' + regErr.message });
+      }
+    }
+
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      return res.status(500).json({ error: 'Unable to generate PDF. Please try again.' });
     }
 
     // Log download activity
@@ -460,8 +473,20 @@ async function sendEmail(req, res, next) {
       ? path.join(__dirname, '..', 'public', ticket.pdf_path.replace(/^\//, ''))
       : null;
 
+    // Auto-regenerate if file is missing (handles Render's ephemeral filesystem)
     if (!pdfPath || !fs.existsSync(pdfPath)) {
-      return res.status(400).json({ error: 'PDF file not found. Please regenerate the ticket first.' });
+      try {
+        const updatedTicket = await ticketService.regeneratePDF(ticket.ticket_id);
+        pdfPath = updatedTicket.pdf_path
+          ? path.join(__dirname, '..', 'public', updatedTicket.pdf_path.replace(/^\//, ''))
+          : null;
+      } catch (regErr) {
+        return res.status(500).json({ error: 'Failed to regenerate PDF: ' + regErr.message });
+      }
+    }
+
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      return res.status(500).json({ error: 'Unable to generate PDF. Please try again.' });
     }
 
     const { sendTicketEmail } = require('../utils/sendEmail');
