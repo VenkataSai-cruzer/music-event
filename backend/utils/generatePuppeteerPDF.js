@@ -275,7 +275,7 @@ async function generatePuppeteerPDF(ticket, qrPathOrUrl, eventLogoPath, settings
     // Set content and wait for jsbarcode to render
     // Increased timeout for cold start + premium template rendering
     await page.setContent(html, {
-      waitUntil: ['load', 'networkidle0'],
+      waitUntil: ['load', 'networkidle2'],
       timeout: 45000,
     });
 
