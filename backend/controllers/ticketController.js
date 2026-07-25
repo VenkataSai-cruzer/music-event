@@ -1,141 +1,195 @@
-const { v4: uuidv4 } = require('uuid');
+const ticketService = require('../services/ticketService');
 const path = require('path');
 const fs = require('fs');
-const pool = require('../db/db');
-const generateQR = require('../utils/generateQR');
-const generatePDF = require('../utils/generatePDF');
 
 /**
  * POST /api/tickets
- * Creates a new ticket, generates a QR code and PDF, saves to DB.
+ * Creates a new ticket.
  */
-async function createTicket(req, res) {
-  const { attendee_name, email, event_name, event_date, venue, seat_number } = req.body;
-
-  if (!attendee_name || !email || !event_name || !event_date || !venue) {
-    return res.status(400).json({ error: 'Missing required fields: attendee_name, email, event_name, event_date, venue' });
-  }
-
-  const ticketId = uuidv4();
-
+async function createTicket(req, res, next) {
   try {
-    // Generate QR code image
-    const qrPath = await generateQR(ticketId);
-
-    // Insert ticket into the database
-    const result = await pool.query(
-      `INSERT INTO tickets (id, attendee_name, email, event_name, event_date, venue, seat_number, qr_code_path)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [ticketId, attendee_name, email, event_name, event_date, venue, seat_number || null, qrPath]
-    );
-
-    const ticket = result.rows[0];
-
-    // Generate PDF ticket
-    const pdfPath = await generatePDF(ticket, qrPath);
-
-    // Update the DB row with the PDF path
-    await pool.query(
-      `UPDATE tickets SET pdf_path = $1 WHERE id = $2`,
-      [pdfPath, ticketId]
-    );
-
-    return res.status(201).json({
-      message: 'Ticket created successfully',
-      ticket: { ...ticket, pdf_path: pdfPath },
-    });
+    const ticket = await ticketService.createTicket(req.body);
+    return res.status(201).json({ message: 'Ticket created successfully', ticket });
   } catch (err) {
-    console.error('Error creating ticket:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    next(err);
   }
 }
 
 /**
  * GET /api/tickets
- * Returns all tickets.
+ * Returns all tickets with search, filter, pagination.
  */
-async function getAllTickets(req, res) {
+async function getAllTickets(req, res, next) {
   try {
-    const result = await pool.query('SELECT * FROM tickets ORDER BY created_at DESC');
-    return res.json(result.rows);
+    const { search, status, page, limit } = req.query;
+    const result = await ticketService.getAllTickets({
+      search,
+      status,
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 20,
+    });
+    return res.json(result);
   } catch (err) {
-    console.error('Error fetching tickets:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    next(err);
+  }
+}
+
+/**
+ * GET /api/tickets/dashboard
+ * Returns dashboard statistics.
+ */
+async function getDashboard(req, res, next) {
+  try {
+    const stats = await ticketService.getDashboardStats();
+    return res.json(stats);
+  } catch (err) {
+    next(err);
   }
 }
 
 /**
  * GET /api/tickets/:id
- * Returns a single ticket by ID.
+ * Returns a single ticket by database ID.
  */
-async function getTicketById(req, res) {
-  const { id } = req.params;
+async function getTicketById(req, res, next) {
   try {
-    const result = await pool.query('SELECT * FROM tickets WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
+    const ticket = await ticketService.getTicketById(req.params.id);
+    if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
-    return res.json(result.rows[0]);
+    return res.json(ticket);
   } catch (err) {
-    console.error('Error fetching ticket:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    next(err);
   }
 }
 
 /**
- * GET /api/tickets/:id/download
+ * GET /api/tickets/download/:ticketId
  * Streams the PDF file for download.
+ * ticketId is the ME-2026-000001 format.
  */
-async function downloadTicket(req, res) {
-  const { id } = req.params;
+async function downloadTicket(req, res, next) {
   try {
-    const result = await pool.query('SELECT pdf_path FROM tickets WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
+    const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
+    if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const pdfPath = result.rows[0].pdf_path;
+    const pdfPath = ticket.pdf_path
+      ? path.join(__dirname, '..', 'public', ticket.pdf_path.replace(/^\//, ''))
+      : null;
+
     if (!pdfPath || !fs.existsSync(pdfPath)) {
-      return res.status(404).json({ error: 'PDF file not found on server' });
+      return res.status(404).json({ error: 'PDF file not found. Try regenerating.' });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="ticket-${id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${ticket.ticket_id}.pdf"`);
     fs.createReadStream(pdfPath).pipe(res);
   } catch (err) {
-    console.error('Error downloading ticket:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    next(err);
   }
 }
 
 /**
- * DELETE /api/tickets/:id
- * Deletes a ticket and its associated files.
+ * POST /api/tickets/verify
+ * Verifies a QR token (UUID) and returns ticket info.
  */
-async function deleteTicket(req, res) {
-  const { id } = req.params;
+async function verifyTicket(req, res, next) {
   try {
-    const result = await pool.query('SELECT qr_code_path, pdf_path FROM tickets WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Ticket not found' });
+    const { qr_token } = req.body;
+    if (!qr_token) {
+      return res.status(400).json({ error: 'qr_token is required' });
     }
 
-    const { qr_code_path, pdf_path } = result.rows[0];
+    const ticket = await ticketService.verifyTicketByQrToken(qr_token);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Invalid ticket', valid: false });
+    }
 
-    // Delete associated files
-    [qr_code_path, pdf_path].forEach((filePath) => {
-      if (filePath && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+    return res.json({
+      valid: true,
+      ticket: {
+        ticket_id: ticket.ticket_id,
+        name: ticket.name,
+        status: ticket.status,
+        event_date: ticket.event_date,
+        event_address: ticket.event_address,
+        scanned_at: ticket.scanned_at,
+      },
     });
-
-    await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
-    return res.json({ message: 'Ticket deleted successfully' });
   } catch (err) {
-    console.error('Error deleting ticket:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    next(err);
   }
 }
 
-module.exports = { createTicket, getAllTickets, getTicketById, downloadTicket, deleteTicket };
+/**
+ * PUT /api/tickets/use/:ticketId
+ * Marks a ticket as USED (entry approved).
+ */
+async function useTicket(req, res, next) {
+  try {
+    const ticket = await ticketService.useTicket(req.params.ticketId);
+    return res.json({ message: 'Entry approved', ticket });
+  } catch (err) {
+    if (err.statusCode === 409) {
+      return res.status(409).json({
+        error: err.message,
+        ticket: err.ticket ? {
+          ticket_id: err.ticket.ticket_id,
+          name: err.ticket.name,
+          status: err.ticket.status,
+          scanned_at: err.ticket.scanned_at,
+        } : undefined,
+      });
+    }
+    if (err.statusCode === 404) {
+      return res.status(404).json({ error: err.message });
+    }
+    next(err);
+  }
+}
+
+/**
+ * DELETE /api/tickets/:ticketId
+ * Deletes a ticket by ticket_id (ME-2026-XXXXXX).
+ */
+async function deleteTicket(req, res, next) {
+  try {
+    const ticket = await ticketService.deleteTicket(req.params.ticketId);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    return res.json({ message: 'Ticket deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/tickets/regenerate/:ticketId
+ * Regenerates the PDF for an existing ticket.
+ */
+async function regeneratePDF(req, res, next) {
+  try {
+    const ticket = await ticketService.regeneratePDF(req.params.ticketId);
+    return res.json({ message: 'PDF regenerated successfully', ticket });
+  } catch (err) {
+    if (err.statusCode === 404) {
+      return res.status(404).json({ error: err.message });
+    }
+    next(err);
+  }
+}
+
+module.exports = {
+  createTicket,
+  getAllTickets,
+  getDashboard,
+  getTicketById,
+  downloadTicket,
+  verifyTicket,
+  useTicket,
+  deleteTicket,
+  regeneratePDF,
+};
