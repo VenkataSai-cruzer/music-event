@@ -22,6 +22,8 @@ export const ticketService = {
 
   getTicketTimeline: (ticketId) => api.get(`/tickets/${ticketId}/timeline`),
 
+  preview: (ticketId) => `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/tickets/preview/${ticketId}`,
+
   exportCsv: () => api.get('/tickets/export/csv', { responseType: 'blob' }),
 
   regeneratePDF: (ticketId) => api.post(`/tickets/regenerate/${ticketId}`),

@@ -6,6 +6,7 @@ const {
   getDashboard,
   getTicketById,
   downloadTicket,
+  previewTicket,
   verifyTicket,
   useTicket,
   deleteTicket,
@@ -20,6 +21,9 @@ const {
 const { authenticateToken } = require('../middleware/auth');
 const { createTicketValidation } = require('../middleware/validate');
 const multer = require('multer');
+
+// Ticket preview (HTML version identical to PDF - no auth required for preview)
+router.get('/preview/:ticketId', previewTicket);
 
 // All ticket routes require authentication
 router.use(authenticateToken);

@@ -37,7 +37,12 @@ const createTables = async () => {
         contact_number  VARCHAR(20),
         support_email   VARCHAR(255),
         last_login_at   TIMESTAMPTZ,
-        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        additional_logos      JSONB DEFAULT '{}'::jsonb,
+        website               VARCHAR(255),
+        instagram             VARCHAR(255),
+        emergency_contact     VARCHAR(20),
+        event_tagline         VARCHAR(255)
       );
     `);
 

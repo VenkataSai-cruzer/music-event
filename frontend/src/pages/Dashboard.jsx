@@ -179,6 +179,34 @@ export default function Dashboard() {
               <p className="text-sm text-gray-400">First login not recorded</p>
             )}
           </div>
+
+          {/* Scanner Stats Summary */}
+          {stats?.todayScanned > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
+                <TrendingUp className="w-4 h-4 text-indigo-500" />
+                Scanner Summary
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Scanned Today</span>
+                  <span className="font-semibold text-gray-900">{stats.todayScanned}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Inside Venue</span>
+                  <span className="font-semibold text-gray-900">{stats.used}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Remaining</span>
+                  <span className="font-semibold text-gray-900">{stats.remaining}</span>
+                </div>
+                <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5">
+                  <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${stats.total > 0 ? (stats.used / stats.total) * 100 : 0}%` }} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

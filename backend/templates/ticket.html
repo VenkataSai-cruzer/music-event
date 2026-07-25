@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7 NOTES — Entry Ticket</title>
+<style>
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 0;
+    font-family: 'Impact', 'Arial Black', 'Helvetica Neue', sans-serif;
+    background: #0a0a0a;
+    color: #ffffff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── Background ── */
+  .ticket {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 20% 10%, rgba(212, 168, 67, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 30%, rgba(212, 168, 67, 0.05) 0%, transparent 50%),
+      linear-gradient(180deg, #0a0a0a 0%, #111111 50%, #0a0a0a 100%);
+  }
+
+  .ticket::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #d4a843, #f0d78c, #d4a843);
+  }
+  .ticket::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #d4a843, #f0d78c, #d4a843);
+  }
+
+  /* ── Perforated side edges ── */
+  .perf-side {
+    position: absolute;
+    top: 40px;
+    bottom: 40px;
+    width: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .perf-left { left: -3px; }
+  .perf-right { right: -3px; }
+  .perf-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #0a0a0a;
+  }
+
+  /* ── Main Card ── */
+  .card {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    right: 20px;
+    bottom: 18px;
+    background: rgba(20, 20, 30, 0.95);
+    border: 1px solid rgba(212, 168, 67, 0.2);
+    border-radius: 16px;
+    padding: 22px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .top-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .brand-area { flex: 1; }
+
+  .subtitle {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: #d4a843;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .event-name {
+    font-family: 'Impact', 'Arial Black', 'Helvetica Neue', sans-serif;
+    font-size: 52px;
+    line-height: 1;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .tagline {
+    font-family: 'Arial', sans-serif;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: rgba(212, 168, 67, 0.7);
+    text-transform: uppercase;
+    font-weight: 300;
+  }
+
+  .status-badge {
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-family: 'Arial', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .status-badge.valid { background: #22c55e; color: #fff; }
+  .status-badge.used { background: #f59e0b; color: #fff; }
+  .status-badge.cancelled { background: #ef4444; color: #fff; }
+
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212, 168, 67, 0.5), transparent);
+    margin: 12px 0;
+  }
+
+  .main-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    min-height: 0;
+  }
+
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .info-icon {
+    width: 26px;
+    height: 26px;
+    background: rgba(212, 168, 67, 0.12);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .info-icon svg { width: 13px; height: 13px; fill: none; stroke: #d4a843; stroke-width: 2; }
+
+  .info-label {
+    font-family: 'Arial', sans-serif;
+    font-size: 7.5px;
+    letter-spacing: 1.5px;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .info-value {
+    font-family: 'Arial', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #ffffff;
+    line-height: 1.3;
+  }
+  .info-value.small { font-size: 10px; opacity: 0.8; }
+
+  .right-panel {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(212, 168, 67, 0.15), transparent 60%);
+    border: 1px solid rgba(212, 168, 67, 0.15);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .section-title {
+    font-family: 'Arial', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #d4a843;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .attendee-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .attendee-field:last-child { border-bottom: none; }
+
+  .field-label {
+    font-family: 'Arial', sans-serif;
+    font-size: 7.5px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .field-value {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    color: #fff;
+    text-align: right;
+    max-width: 55%;
+    word-break: break-word;
+  }
+
+  .bottom-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding-top: 8px;
+    margin-top: auto;
+  }
+
+  .qr-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .qr-area img {
+    width: 200px;
+    height: 200px;
+    border-radius: 12px;
+    background: #fff;
+    padding: 10px;
+  }
+  .qr-label {
+    font-family: 'Arial', sans-serif;
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: rgba(212, 168, 67, 0.6);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .barcode-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .barcode-area svg {
+    max-width: 100%;
+    height: 42px;
+    background: #fff;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .barcode-label {
+    font-family: 'Arial', sans-serif;
+    font-size: 6.5px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .footer-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(212, 168, 67, 0.12);
+    margin-top: 6px;
+  }
+
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .footer-logo-img {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+  .footer-logo-placeholder {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: rgba(212, 168, 67, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 9px;
+    color: #d4a843;
+  }
+  .footer-logo-label {
+    font-family: 'Arial', sans-serif;
+    font-size: 5.5px;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 500;
+    max-width: 60px;
+    line-height: 1.2;
+  }
+
+  .footer-text { text-align: center; margin-top: 5px; }
+  .footer-terms {
+    font-family: 'Arial', sans-serif;
+    font-size: 6.5px;
+    color: rgba(255, 255, 255, 0.25);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .footer-motto {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: rgba(212, 168, 67, 0.6);
+    margin-top: 2px;
+  }
+  .footer-ticket-id {
+    font-size: 6px;
+    color: rgba(255, 255, 255, 0.15);
+    margin-top: 2px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .logo-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .logo-item { display: flex; align-items: center; gap: 4px; }
+  .logo-img { height: 24px; width: auto; object-fit: contain; }
+  .logo-text {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 16px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+  .logo-sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(212, 168, 67, 0.2);
+  }
+
+  @media print {
+    body { background: #0a0a0a; margin: 0; }
+    .card { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="ticket">
+  <div class="perf-side perf-left">
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div>
+  </div>
+  <div class="perf-side perf-right">
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div><div class="perf-dot"></div>
+    <div class="perf-dot"></div><div class="perf-dot"></div>
+  </div>
+
+  <div class="card">
+    <!-- Top: Brand + Status -->
+    <div class="top-section">
+      <div class="brand-area">
+        <div class="subtitle">Live Jamming Session</div>
+        <div class="event-name">7 NOTES</div>
+        <div class="tagline">Feel It. Live It. Be It.</div>
+      </div>
+      <div class="status-badge {{STATUS_CLASS}}">{{STATUS_LABEL}}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Logo Bar -->
+    <div class="logo-bar">
+      {{LOGOS_HTML}}
+    </div>
+
+    <div class="divider" style="margin: 6px 0;"></div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Left: Event Info -->
+      <div class="left-panel">
+        <div class="info-row">
+          <div class="info-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+          <div><div class="info-label">Date</div><div class="info-value">Saturday, 8 August 2026</div></div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          <div><div class="info-label">Time</div><div class="info-value">5:30 PM — 9:00 PM</div></div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+          <div><div class="info-label">Venue</div><div class="info-value">CAFOOZE</div><div class="info-value small">Plot No. 7, Engineers Enclave,<br/>Y Junction, VT Agraharam,<br/>Vizianagaram</div></div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+          <div><div class="info-label">Contact</div><div class="info-value small">86888141067 | 9381755977</div></div>
+        </div>
+      </div>
+
+      <!-- Right: Attendee Details -->
+      <div class="right-panel">
+        <div class="section-title">Attendee Details</div>
+        <div class="divider" style="margin: 3px 0;"></div>
+        <div class="attendee-field">
+          <span class="field-label">Attendee</span>
+          <span class="field-value">{{ATTENDEE_NAME}}</span>
+        </div>
+        <div class="attendee-field">
+          <span class="field-label">Gender</span>
+          <span class="field-value">{{ATTENDEE_GENDER}}</span>
+        </div>
+        <div class="attendee-field">
+          <span class="field-label">Email</span>
+          <span class="field-value">{{ATTENDEE_EMAIL}}</span>
+        </div>
+        <div class="attendee-field">
+          <span class="field-label">Mobile</span>
+          <span class="field-value">{{ATTENDEE_MOBILE}}</span>
+        </div>
+        <div class="attendee-field">
+          <span class="field-label">Ticket ID</span>
+          <span class="field-value" style="font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 1px; color: #d4a843;">{{TICKET_ID}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Bottom: QR + Barcode -->
+    <div class="bottom-section">
+      <div class="qr-area">
+        <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR Code" />
+        <span class="qr-label">Scan at Entry</span>
+      </div>
+      <div class="barcode-area">
+        <svg id="barcode"></svg>
+        <span class="barcode-label">Ticket ID • {{TICKET_ID}}</span>
+      </div>
+    </div>
+
+    <!-- Footer Logos -->
+    <div class="footer-logos">
+      <div class="footer-logo">
+        <div class="footer-logo-placeholder">7N</div>
+        <span class="footer-logo-label">7 NOTES</span>
+      </div>
+      <div class="footer-logo">
+        <div class="footer-logo-placeholder">CF</div>
+        <span class="footer-logo-label">CAFOOZE</span>
+      </div>
+      <div class="footer-logo">
+        <div class="footer-logo-placeholder" style="font-size:7px;">YDM</div>
+        <span class="footer-logo-label">Yours Digital</span>
+      </div>
+      <div class="footer-logo">
+        <div class="footer-logo-placeholder" style="font-size:7px;">FS</div>
+        <span class="footer-logo-label">Fisandy</span>
+      </div>
+    </div>
+
+    <!-- Footer Text -->
+    <div class="footer-text">
+      <span class="footer-terms">Non Transferable • Non Refundable</span>
+      <div class="footer-motto">GOOD MUSIC • GOOD PEOPLE • GREAT MEMORIES</div>
+      <div class="footer-ticket-id">ID: {{TICKET_ID}} • Generated: {{GENERATED_TIME}}</div>
+    </div>
+  </div>
+</div>
+<script>{{JSBARCODE_SCRIPT}}</script>
+<script>
+  try {
+    JsBarcode("#barcode", "{{TICKET_ID}}", {
+      format: "CODE128",
+      width: 1.6,
+      height: 40,
+      displayValue: false,
+      background: "#ffffff",
+      lineColor: "#111111",
+      margin: 0,
+    });
+  } catch(e) {
+    document.getElementById('barcode').outerHTML = '<span style="font-family:monospace;font-size:11px;background:#fff;color:#111;padding:6px 12px;border-radius:4px;">{{TICKET_ID}}</span>';
+  }
+</script>
+</body>
+</html>

@@ -61,6 +61,38 @@ async function getDashboard(req, res, next) {
 }
 
 /**
+ * GET /api/tickets/preview/:ticketId
+ * Returns the HTML ticket preview (identical to what the PDF will look like).
+ * Uses the shared renderTicketHTML from generatePuppeteerPDF to avoid code duplication.
+ */
+async function previewTicket(req, res, next) {
+  try {
+    const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    const settings = await ticketService.getEventSettings();
+    const logoAbsolutePath = settings?.event_logo
+      ? path.join(__dirname, '..', 'public', settings.event_logo.replace(/^\//, ''))
+      : null;
+
+    const qrAbsolutePath = ticket.qr_path
+      ? path.join(__dirname, '..', 'public', ticket.qr_path.replace(/^\//, ''))
+      : null;
+
+    // Use the shared template renderer from the PDF generator
+    const { renderTicketHTML } = require('../utils/generatePuppeteerPDF');
+    const html = renderTicketHTML(ticket, qrAbsolutePath, logoAbsolutePath);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * GET /api/tickets/:id
  * Returns a single ticket by database ID.
  */
@@ -402,6 +434,7 @@ module.exports = {
   getDashboard,
   getTicketById,
   downloadTicket,
+  previewTicket,
   verifyTicket,
   useTicket,
   deleteTicket,

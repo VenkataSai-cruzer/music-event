@@ -11,4 +11,13 @@ export const settingsService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+  uploadAdditionalLogo: (file, logoKey) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    formData.append('logoKey', logoKey);
+    return api.post('/settings/logo/additional', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const { getSettings, updateSettings, uploadLogo } = require('../controllers/settingsController');
+const { getSettings, updateSettings, uploadLogo, uploadAdditionalLogo } = require('../controllers/settingsController');
 const { authenticateToken } = require('../middleware/auth');
 
 // All settings routes require authentication
@@ -15,7 +15,9 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `event-logo${ext}`);
+    // Use a key-prefixed filename to avoid collisions
+    const key = req.body.logoKey || 'event-logo';
+    cb(null, `${key}${ext}`);
   },
 });
 
@@ -27,5 +29,8 @@ const upload = multer({
 router.get('/', getSettings);
 router.put('/', updateSettings);
 router.post('/logo', upload.single('logo'), uploadLogo);
+
+// Upload additional logos (partner, sponsor, etc.)
+router.post('/logo/additional', upload.single('logo'), uploadAdditionalLogo);
 
 module.exports = router;

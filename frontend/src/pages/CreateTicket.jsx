@@ -109,69 +109,18 @@ export default function CreateTicket() {
             <h1 className="text-2xl font-bold text-gray-900">Ticket Created</h1>
             <p className="text-gray-500 text-sm">Review and download</p>
           </div>
-        </div>
-
-        {/* Ticket Card Preview */}
-        <div className="bg-white rounded-xl border-2 border-indigo-100 overflow-hidden">
-          {/* Decorative top bar */}
-          <div className="h-2 bg-gradient-to-r from-indigo-600 to-purple-600" />
-
-          <div className="p-6 space-y-4">
-            <div className="text-center">
-              <p className="text-xs text-gray-400 uppercase tracking-wider">Ticket ID</p>
-              <p className="text-xl font-bold text-indigo-600 font-mono">{preview.ticket_id}</p>
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Name</span>
-                <span className="font-medium text-gray-900">{preview.name}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Gender</span>
-                <span className="font-medium text-gray-900">{preview.gender}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Email</span>
-                <span className="font-medium text-gray-900">{preview.email}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Mobile</span>
-                <span className="font-medium text-gray-900">{preview.mobile}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Event Date</span>
-                <span className="font-medium text-gray-900">
-                  {new Date(preview.event_date).toLocaleDateString('en-US', {
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Venue</span>
-                <span className="font-medium text-gray-900 text-right max-w-[200px]">{preview.event_address}</span>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 flex justify-center">
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                {preview.status}
-              </span>
-            </div>
-
-            {/* QR Code Preview */}
-            {preview.qr_token && (
-              <div className="flex justify-center pt-2">
-                <img
-                  src={`${API_URL}/qrcodes/${preview.qr_token}.png`}
-                  alt="QR Code"
-                  className="w-24 h-24"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              </div>
-            )}
+        </div>          {/* ── Premium HTML Ticket Preview ── */}
+          <div className="bg-gray-900 rounded-2xl overflow-hidden shadow-2xl" style={{ height: '500px' }}>
+            <iframe
+              src={ticketService.preview(preview.ticket_id)}
+              className="w-full h-full border-0"
+              title="Ticket Preview"
+              sandbox="allow-scripts allow-same-origin"
+            />
           </div>
-        </div>
+          <p className="text-xs text-center text-gray-400">
+            This is a preview of the ticket. The downloaded PDF will look identical.
+          </p>
 
         {/* Actions */}
         <div className="flex gap-3">

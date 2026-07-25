@@ -36,6 +36,73 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scan-line {
+  0%, 100% { top: 8%; }
+  50% { top: 88%; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .animate-in {
   animation: fade-in 0.2s ease-out;
+}
+
+.animate-in-up {
+  animation: fade-in-up 0.3s ease-out;
+}
+
+.animate-scan {
+  animation: scan-line 2.5s ease-in-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ── Loading skeleton ── */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Scanner corner brackets ── */
+.scanner-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: rgba(99, 102, 241, 0.7);
+}
+.scanner-corner-tl { top: 12px; left: 12px; border-top: 3px solid; border-left: 3px solid; border-radius: 8px 0 0 0; }
+.scanner-corner-tr { top: 12px; right: 12px; border-top: 3px solid; border-right: 3px solid; border-radius: 0 8px 0 0; }
+.scanner-corner-bl { bottom: 12px; left: 12px; border-bottom: 3px solid; border-left: 3px solid; border-radius: 0 0 0 8px; }
+.scanner-corner-br { bottom: 12px; right: 12px; border-bottom: 3px solid; border-right: 3px solid; border-radius: 0 0 8px 0; }
+
+/* ── Print styles ── */
+@media print {
+  body { background: white !important; }
+  .no-print { display: none !important; }
+}
+
+/* ── Status chip base ── */
+.status-chip {
+  @apply px-2.5 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1;
 }

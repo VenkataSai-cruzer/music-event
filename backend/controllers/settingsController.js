@@ -35,6 +35,11 @@ async function updateSettings(req, res, next) {
     organizer_name,
     contact_number,
     support_email,
+    website,
+    instagram,
+    emergency_contact,
+    event_tagline,
+    additional_logos,
   } = req.body;
 
   try {
@@ -48,6 +53,11 @@ async function updateSettings(req, res, next) {
         organizer_name = COALESCE($6, organizer_name),
         contact_number = COALESCE($7, contact_number),
         support_email = COALESCE($8, support_email),
+        website = COALESCE($9, website),
+        instagram = COALESCE($10, instagram),
+        emergency_contact = COALESCE($11, emergency_contact),
+        event_tagline = COALESCE($12, event_tagline),
+        additional_logos = CASE WHEN $13::jsonb IS NOT NULL THEN $13::jsonb ELSE additional_logos END,
         updated_at = NOW()
        WHERE id = 1
        RETURNING *`,
@@ -60,6 +70,11 @@ async function updateSettings(req, res, next) {
         organizer_name || null,
         contact_number || null,
         support_email || null,
+        website || null,
+        instagram || null,
+        emergency_contact || null,
+        event_tagline || null,
+        typeof additional_logos !== 'undefined' ? JSON.stringify(additional_logos) : null,
       ]
     );
 
@@ -100,4 +115,49 @@ async function uploadLogo(req, res, next) {
   }
 }
 
-module.exports = { getSettings, updateSettings, uploadLogo };
+/**
+ * POST /api/settings/logo/additional
+ * Uploads additional logos (partner, sponsor, community, media, organizer).
+ * Stores in public/logos and saves path to event_settings.additional_logos JSONB.
+ */
+async function uploadAdditionalLogo(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'Only PNG, JPEG, WebP, and SVG images are allowed' });
+    }
+
+    const logoKey = req.body.logoKey;
+    if (!logoKey) {
+      return res.status(400).json({ error: 'logoKey is required (e.g., partner1, sponsor1, etc.)' });
+    }
+
+    const logoPath = `/logos/${req.file.filename}`;
+
+    // Get current additional_logos
+    const current = await pool.query(
+      'SELECT additional_logos FROM event_settings WHERE id = 1'
+    );
+    const logos = current.rows[0]?.additional_logos || {};
+    logos[logoKey] = logoPath;
+
+    await pool.query(
+      `UPDATE event_settings SET additional_logos = $1, updated_at = NOW() WHERE id = 1`,
+      [JSON.stringify(logos)]
+    );
+
+    return res.json({
+      message: 'Logo uploaded successfully',
+      logo_url: logoPath,
+      logoKey,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getSettings, updateSettings, uploadLogo, uploadAdditionalLogo };

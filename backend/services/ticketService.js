@@ -66,8 +66,8 @@ async function createTicket(ticketData) {
     ? path.join(__dirname, '..', 'public', settings.event_logo.replace(/^\//, ''))
     : null;
 
-  // Generate PDF with event logo (or fallback placeholder)
-  const pdfRelativePath = await generatePDF(ticket, qrRelativePath, logoAbsolutePath);
+  // Generate premium PDF with event logo, settings (sponsors, footer, etc.)
+  const pdfRelativePath = await generatePDF(ticket, qrRelativePath, logoAbsolutePath, settings || {});
 
   // Store the PDF path for download reference
   const updated = await pool.query(
@@ -214,7 +214,11 @@ async function regeneratePDF(ticketId) {
     : null;
 
   const qrAbsolutePath = path.join(__dirname, '..', 'public', ticket.qr_path);
-  const pdfPath = await generatePDF(ticket, qrAbsolutePath, logoAbsolutePath);
+  // Pass current settings for sponsor logos, footer, etc.
+  const pdfPath = await generatePDF(ticket, qrAbsolutePath, logoAbsolutePath, settings || {});
+
+  // Log regeneration activity
+  await logActivity(ticketId, 'downloaded', { regenerated: true }).catch(() => {});
 
   const updated = await pool.query(
     `UPDATE tickets SET pdf_path = $1, updated_at = NOW() WHERE ticket_id = $2 RETURNING *`,
