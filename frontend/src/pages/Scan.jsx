@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { ticketService } from '../services/ticketService';
 
 const QR_SCANNER_ID = 'qr-scanner';
-const RESULT_DISPLAY_MS = 5000;
+const RESULT_DISPLAY_MS = 4000;
 const POLL_INTERVAL_MS = 10000;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -13,7 +14,8 @@ export default function Scan() {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState('idle'); // idle | loading | ready | error
+  const [cameraError, setCameraError] = useState(null);
   const [counter, setCounter] = useState({ used: 0, remaining: 0, total: 0 });
   const [loggedIn, setLoggedIn] = useState(() => !!sessionStorage.getItem('scannerToken'));
   const [loginUsername, setLoginUsername] = useState('');
@@ -24,7 +26,6 @@ export default function Scan() {
       const saved = sessionStorage.getItem('scannerInfo');
       return saved ? JSON.parse(saved) : null;
     } catch {
-      // Previous version may have stored non-JSON data — clean it up
       sessionStorage.removeItem('scannerInfo');
       return null;
     }
@@ -34,19 +35,6 @@ export default function Scan() {
   const scanningRef = useRef(false);
   const resumeTimerRef = useRef(null);
   const pollTimerRef = useRef(null);
-  const onScanSuccessRef = useRef(null);
-
-  // ── Lazy scanner — only creates Html5Qrcode when Start is clicked ──
-  const getScanner = useCallback(() => {
-    if (!scannerRef.current) {
-      try {
-        scannerRef.current = new Html5Qrcode(QR_SCANNER_ID);
-      } catch (e) {
-        console.error('Failed to create scanner:', e);
-      }
-    }
-    return scannerRef.current;
-  }, []);
 
   // ── Sound effects ──
   const playSound = useCallback((type) => {
@@ -57,7 +45,6 @@ export default function Scan() {
       osc.connect(gain);
       gain.connect(ctx.destination);
       gain.gain.value = 0.15;
-
       if (type === 'success') {
         osc.frequency.setValueAtTime(880, ctx.currentTime);
         osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
@@ -98,12 +85,25 @@ export default function Scan() {
 
   const getScannedBy = useCallback(() => scannerInfo?.display_name || 'Scanner', [scannerInfo]);
 
-  // ── Atomic verify+approve ──
+  // ── Lazy scanner factory (single instance) ──
+  const getScanner = useCallback(() => {
+    if (!scannerRef.current) {
+      try {
+        scannerRef.current = new Html5Qrcode(QR_SCANNER_ID);
+      } catch (e) {
+        console.error('Failed to create scanner:', e);
+        return null;
+      }
+    }
+    return scannerRef.current;
+  }, []);
+
+  // ── Verify QR and show result ──
   const handleVerifyScan = useCallback(async (decodedText) => {
     try {
       const scannedBy = getScannedBy();
       const res = await ticketService.verify(decodedText, scannedBy);
-      setResult(res.data);
+
       if (res.data.action === 'approved') {
         playSound('success');
         fetchCounter();
@@ -112,83 +112,125 @@ export default function Scan() {
       } else {
         playSound('error');
       }
+      setResult(res.data);
     } catch (err) {
-      setResult({ valid: false, action: 'invalid', error: 'Invalid QR code' });
-      playSound('error');
+      // Network error vs invalid QR
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        setResult({ valid: false, action: 'network_error', error: 'Unable to reach server. Check connection.' });
+        playSound('error');
+      } else {
+        setResult({ valid: false, action: 'invalid', error: 'Invalid QR code' });
+        playSound('error');
+      }
     } finally {
       setProcessing(false);
     }
   }, [playSound, getScannedBy, fetchCounter]);
 
-  useEffect(() => {
-    onScanSuccessRef.current = (decodedText) => {
-      setProcessing(true);
-      const s = scannerRef.current;
-      if (s) s.stop().catch(() => {});
-      setScanning(false);
-      handleVerifyScan(decodedText);
-    };
-  });
+  // ── Resume scanner after result display ──
+  const resumeScanner = useCallback(() => {
+    setResult(null);
+    const scanner = scannerRef.current;
+    if (scanner && scanningRef.current) {
+      try { scanner.resume(); } catch (e) { /* already stopped */ }
+      setScanning(true);
+      setCameraStatus('ready');
+    }
+  }, []);
 
-  // Auto-resume scanner after result
+  // Auto-resume after result timeout
   useEffect(() => {
     if (!result) return;
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-    resumeTimerRef.current = setTimeout(() => {
-      setResult(null);
-      startScanner();
-    }, RESULT_DISPLAY_MS);
+    resumeTimerRef.current = setTimeout(resumeScanner, RESULT_DISPLAY_MS);
     return () => { if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current); };
-  }, [result, startScanner]);
+  }, [result, resumeScanner]);
 
+  // ── Start scanner ──
   const startScanner = useCallback(async () => {
     const scanner = getScanner();
     if (!scanner) {
-      toast.error('Scanner initialization failed');
-      setScanning(false);
+      setCameraError('Scanner initialization failed');
+      setCameraStatus('error');
       return;
     }
+
     setScanning(true);
     scanningRef.current = true;
     setResult(null);
-    setCameraReady(false);
+    setCameraStatus('loading');
+    setCameraError(null);
+
     try {
+      // Try rear camera first
       await scanner.start(
         { facingMode: 'environment' },
         { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
-        (decodedText) => onScanSuccessRef.current?.(decodedText),
-        () => {}
+        (decodedText) => {
+          // Pause scanning while verifying to prevent duplicate scans
+          try { scanner.pause(); } catch (e) { /* not started */ }
+          setScanning(false);
+          setProcessing(true);
+          handleVerifyScan(decodedText);
+        },
+        () => {} // ignore useless scan results
       );
-      setCameraReady(true);
+      setCameraStatus('ready');
     } catch (err) {
+      // Rear camera failed — try front camera
       try {
         await scanner.start(
           { facingMode: 'user' },
           { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
-          (decodedText) => onScanSuccessRef.current?.(decodedText),
+          (decodedText) => {
+            try { scanner.pause(); } catch (e) {}
+            setScanning(false);
+            setProcessing(true);
+            handleVerifyScan(decodedText);
+          },
           () => {}
         );
-        setCameraReady(true);
+        setCameraStatus('ready');
+        setCameraError('Using front camera — QR may be harder to scan');
       } catch (err2) {
-        toast.error('Unable to access camera. Check permissions.');
+        // Both cameras failed — determine reason
+        const msg = err2?.message || '';
+        if (msg.includes('permission') || msg.includes('NotAllowed')) {
+          setCameraError('permission_denied');
+        } else if (msg.includes('NotFound') || msg.includes('no camera')) {
+          setCameraError('no_camera');
+        } else {
+          setCameraError(msg || 'Camera unavailable');
+        }
+        setCameraStatus('error');
         setScanning(false);
+        scanningRef.current = false;
       }
     }
-  }, [getScanner]);
+  }, [getScanner, handleVerifyScan]);
 
+  // ── Stop scanner ──
   const stopScanner = useCallback(async () => {
     scanningRef.current = false;
-    try { if (scannerRef.current) await scannerRef.current.stop(); } catch (e) {}
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
     setScanning(false);
-    setCameraReady(false);
+    setCameraStatus('idle');
+    setCameraError(null);
+    const scanner = scannerRef.current;
+    if (scanner) {
+      try { await scanner.stop(); } catch (e) {}
+    }
   }, []);
 
-  // Cleanup on unmount
+  // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-      if (scannerRef.current && scanningRef.current) {
-        scannerRef.current.stop().catch(() => {});
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      const scanner = scannerRef.current;
+      if (scanner && scanningRef.current) {
+        scanner.stop().catch(() => {});
+        scanner.clear().catch(() => {});
       }
     };
   }, []);
@@ -198,7 +240,9 @@ export default function Scan() {
     if (!loginUsername.trim() || !loginPassword.trim()) return;
     setLoggingIn(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/scanner-login`, { username: loginUsername, password: loginPassword });
+      const res = await axios.post(`${API_URL}/api/auth/scanner-login`, {
+        username: loginUsername, password: loginPassword
+      });
       const { token, scanner } = res.data;
       sessionStorage.setItem('scannerToken', token);
       sessionStorage.setItem('scannerInfo', JSON.stringify(scanner));
@@ -212,24 +256,24 @@ export default function Scan() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await stopScanner();
     sessionStorage.removeItem('scannerToken');
     sessionStorage.removeItem('scannerInfo');
     setScannerInfo(null);
     setLoggedIn(false);
-    stopScanner();
   };
 
-  // ═══ SCANNER LOGIN ═══
+  // ═══════════════════════════════════
+  //  RENDER: SCANNER LOGIN
+  // ═══════════════════════════════════
   if (!loggedIn) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
         <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-lg p-8">
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
+              <ScanIcon className="w-8 h-8 text-indigo-600" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Scanner Login</h2>
             <p className="text-sm text-gray-500">Sign in with your assigned scanner account</p>
@@ -256,18 +300,21 @@ export default function Scan() {
     );
   }
 
-  // ═══ RESULT SCREEN ═══
+  // ═══════════════════════════════════
+  //  RENDER: RESULT SCREEN
+  // ═══════════════════════════════════
   if (result) {
     const { action } = result;
     const approved = action === 'approved';
     const used = action === 'already_used';
     const invalid = action === 'invalid';
+    const networkError = action === 'network_error';
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
         <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl animate-in">
 
-          {/* APPROVED */}
+          {/* ENTRY APPROVED */}
           {approved && (
             <>
               <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-center">
@@ -277,7 +324,7 @@ export default function Scan() {
                   </svg>
                 </div>
                 <h2 className="text-xl font-bold text-white">ENTRY APPROVED</h2>
-                <p className="text-sm text-green-100 mt-1">Welcome to 7 NOTES! Enjoy the event!</p>
+                <p className="text-sm text-green-100 mt-1">Welcome to 7 NOTES!</p>
               </div>
               <div className="p-6 space-y-3">
                 <div className="bg-green-50 rounded-2xl p-4 space-y-2.5">
@@ -286,10 +333,6 @@ export default function Scan() {
                   <ResultRow label="Scanner" value={getScannedBy()} />
                   <ResultRow label="Time" value={new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
                 </div>
-                <button onClick={() => { setResult(null); startScanner(); }}
-                  className="w-full py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                  Scan Next Ticket
-                </button>
               </div>
             </>
           )}
@@ -315,51 +358,125 @@ export default function Scan() {
                     <ResultRow label="Time" value={new Date(result.ticket.scanned_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
                   )}
                 </div>
-                <button onClick={() => { setResult(null); startScanner(); }}
-                  className="w-full py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                  Scan Next Ticket
+              </div>
+            </>
+          )}
+
+          {/* INVALID QR */}
+          {invalid && (
+            <>
+              <div className="bg-gradient-to-r from-gray-600 to-gray-700 p-8 text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-white">INVALID QR</h2>
+                <p className="text-sm text-gray-300 mt-1">Not recognized in system</p>
+              </div>
+              <div className="p-6 space-y-3">
+                <p className="text-sm text-center text-gray-500">
+                  Only official 7 NOTES tickets are accepted.
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* NETWORK ERROR */}
+          {networkError && (
+            <>
+              <div className="bg-gradient-to-r from-red-500 to-red-600 p-8 text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <WifiOff className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-white">CONNECTION ERROR</h2>
+                <p className="text-sm text-red-100 mt-1">Unable to reach server</p>
+              </div>
+              <div className="p-6 space-y-3">
+                <p className="text-sm text-center text-gray-500">
+                  Check your internet connection and try again.
+                </p>
+                <button onClick={() => { setResult(null); resumeScanner(); }}
+                  className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4" /> Retry
                 </button>
               </div>
             </>
           )}
 
-          {/* INVALID */}
-          {invalid && (
-            <>
-              <div className="bg-gradient-to-r from-gray-600 to-gray-700 p-8 text-center">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-white">INVALID QR</h2>
-                <p className="text-sm text-gray-300 mt-1">QR Code Not Found in System</p>
-              </div>
-              <div className="p-6 space-y-3">
-                <p className="text-sm text-center text-gray-500">This QR code is not recognized. Only 7 NOTES tickets are accepted.</p>
-                <button onClick={() => { setResult(null); startScanner(); }}
-                  className="w-full py-2.5 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                  Scan Next Ticket
-                </button>
-              </div>
-            </>
-          )}
+          {/* Auto-resume countdown bar */}
+          <div className="h-1 bg-gray-100">
+            <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-shrink" />
+          </div>
         </div>
       </div>
     );
   }
 
-  // ═══ MAIN SCANNER VIEW ═══
+  // ═══════════════════════════════════
+  //  RENDER: CAMERA PERMISSION DENIED
+  // ═══════════════════════════════════
+  if (cameraError === 'permission_denied') {
+    return (
+      <div className="max-w-lg mx-auto space-y-4">
+        <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
+          <CameraOff className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Camera Permission Required</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Allow camera access to scan tickets. Check your browser settings and refresh the page.
+          </p>
+          <button onClick={startScanner}
+            className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 mx-auto">
+            <RefreshCw className="w-4 h-4" /> Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════
+  //  RENDER: NO CAMERA DETECTED
+  // ═══════════════════════════════════
+  if (cameraError === 'no_camera') {
+    return (
+      <div className="max-w-lg mx-auto space-y-4">
+        <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
+          <CameraOff className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">No Camera Detected</h2>
+          <p className="text-sm text-gray-500">
+            Use a mobile phone or connect a webcam to scan tickets.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════
+  //  RENDER: CAMERA ERROR
+  // ═══════════════════════════════════
+  if (cameraStatus === 'error' && cameraError) {
+    return (
+      <div className="max-w-lg mx-auto space-y-4">
+        <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
+          <CameraOff className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Camera Error</h2>
+          <p className="text-sm text-gray-500 mb-6">{cameraError}</p>
+          <button onClick={startScanner}
+            className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 mx-auto">
+            <RefreshCw className="w-4 h-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════
+  //  RENDER: MAIN SCANNER VIEW
+  // ═══════════════════════════════════
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      {/* Info Bar */}
-      <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-sm font-medium text-gray-700">{scannerInfo?.display_name || 'Scanner'}</span>
-        </div>
-        <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Logout</button>
-      </div>
+      <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
 
       {/* Entry Counter */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
@@ -380,18 +497,29 @@ export default function Scan() {
       {/* Scanner */}
       <div className="bg-gray-900 rounded-2xl overflow-hidden shadow-lg relative">
         <div className="relative aspect-square">
-          <div id={QR_SCANNER_ID} className={`w-full h-full ${scanning ? '' : 'flex items-center justify-center bg-gray-900'}`}>
-            {!scanning && (
+          <div id={QR_SCANNER_ID} className={`w-full h-full ${(scanning && cameraStatus === 'ready') ? '' : 'flex items-center justify-center bg-gray-900'}`}>
+            {(!scanning || cameraStatus === 'loading') && (
               <div className="text-center p-8">
-                <svg className="w-20 h-20 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2m0 0H8m0 0H6m6 0h4m-4 0H8m0 0v-2m0 2v2m0-2H6m6 0h4" />
-                </svg>
-                <p className="text-gray-500 text-sm">Camera is off</p>
+                {cameraStatus === 'loading' ? (
+                  <>
+                    <svg className="animate-spin w-12 h-12 text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <p className="text-gray-400 text-sm">Starting camera...</p>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-500 text-sm">Camera is off</p>
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          {cameraReady && scanning && (
+          {/* Scan overlay */}
+          {cameraStatus === 'ready' && scanning && (
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute top-4 left-4 w-10 h-10 border-t-2 border-l-2 border-indigo-400 rounded-tl-lg" />
               <div className="absolute top-4 right-4 w-10 h-10 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
@@ -401,6 +529,7 @@ export default function Scan() {
             </div>
           )}
 
+          {/* Processing overlay */}
           {processing && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
               <div className="text-center">
@@ -414,10 +543,22 @@ export default function Scan() {
           )}
         </div>
 
+        {/* Controls */}
         <div className="p-4 bg-gray-900 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-full ${cameraReady ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-            <span className="text-xs text-gray-400">{cameraReady ? 'Camera Ready' : 'Initializing...'}</span>
+            <div className={`w-2.5 h-2.5 rounded-full ${
+              cameraStatus === 'ready' ? 'bg-green-400 animate-pulse' :
+              cameraStatus === 'loading' ? 'bg-yellow-400 animate-pulse' :
+              'bg-gray-500'
+            }`} />
+            <span className="text-xs text-gray-400">
+              {cameraStatus === 'ready' ? 'Camera Ready' :
+               cameraStatus === 'loading' ? 'Starting...' :
+               'Stopped'}
+            </span>
+            {cameraError && cameraError !== 'permission_denied' && cameraError !== 'no_camera' && (
+              <span className="text-xs text-amber-400 ml-2">{cameraError}</span>
+            )}
           </div>
           <button
             onClick={scanning ? stopScanner : startScanner}
@@ -437,11 +578,31 @@ export default function Scan() {
         .animate-scan { animation: scanLine 2.5s ease-in-out infinite; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .animate-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes shrinkWidth { from { width: 100%; } to { width: 0%; } }
+        .animate-shrink { animation: shrinkWidth ${RESULT_DISPLAY_MS}ms linear forwards; }
       `}</style>
     </div>
   );
 }
 
+// ── Status bar component ──
+function ScannerStatusBar({ scannerInfo, onLogout }) {
+  return (
+    <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+        <span className="text-sm font-medium text-gray-700">
+          {scannerInfo?.display_name || 'Scanner'}
+        </span>
+      </div>
+      <button onClick={onLogout} className="text-xs text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1">
+        <LogOut className="w-3 h-3" /> Logout
+      </button>
+    </div>
+  );
+}
+
+// ── Result row component ──
 function ResultRow({ label, value }) {
   if (!value) return null;
   return (
