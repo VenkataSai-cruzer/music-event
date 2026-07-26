@@ -130,13 +130,12 @@ export default function Scan() {
 
   // ── Resume scanner after result display ──
   const resumeScanner = useCallback(() => {
-    setResult(null);
     const scanner = scannerRef.current;
-    if (scanner && scanningRef.current) {
-      try { scanner.resume(); } catch (e) { /* already stopped */ }
-      setScanning(true);
-      setCameraStatus('ready');
+    if (scanner) {
+      try { scanner.resume(); } catch (e) { /* not paused or stopped */ }
     }
+    setResult(null);
+    // scanning stays true throughout — camera never appears to stop
   }, []);
 
   // Auto-resume after result timeout
@@ -166,11 +165,10 @@ export default function Scan() {
       // Try rear camera first
       await scanner.start(
         { facingMode: 'environment' },
-        { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
-        (decodedText) => {
-          // Pause scanning while verifying to prevent duplicate scans
+        { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },          (decodedText) => {
+          // Pause QR processing while verifying — camera stays alive, no state change
           try { scanner.pause(); } catch (e) { /* not started */ }
-          setScanning(false);
+          // DO NOT set scanning=false here — camera stays alive under result overlay
           setProcessing(true);
           handleVerifyScan(decodedText);
         },
@@ -185,7 +183,7 @@ export default function Scan() {
           { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
           (decodedText) => {
             try { scanner.pause(); } catch (e) {}
-            setScanning(false);
+            // Keep scanning=true — camera stays alive under overlay
             setProcessing(true);
             handleVerifyScan(decodedText);
           },
@@ -244,6 +242,9 @@ export default function Scan() {
         username: loginUsername, password: loginPassword
       });
       const { token, scanner } = res.data;
+      // Clear any existing admin token — scanner user must not access admin routes
+      localStorage.removeItem('token');
+      localStorage.removeItem('admin');
       sessionStorage.setItem('scannerToken', token);
       sessionStorage.setItem('scannerInfo', JSON.stringify(scanner));
       setScannerInfo(scanner);
