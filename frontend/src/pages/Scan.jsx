@@ -223,15 +223,14 @@ export default function Scan() {
     }
   }, []);
 
-  // ── Cleanup on unmount ──
+  // ── Cleanup on unmount (await scanner.stop() before clear()) ──
   useEffect(() => {
     return () => {
       if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       const scanner = scannerRef.current;
-      if (scanner && scanningRef.current) {
-        scanner.stop().catch(() => {});
-        scanner.clear().catch(() => {});
+      if (scanner) {
+        scanner.stop().then(() => scanner.clear()).catch(() => {});
       }
     };
   }, []);
@@ -498,8 +497,14 @@ export default function Scan() {
       {/* Scanner */}
       <div className="bg-gray-900 rounded-2xl overflow-hidden shadow-lg relative">
         <div className="relative aspect-square">
-          <div id={QR_SCANNER_ID} className={`w-full h-full ${(scanning && cameraStatus === 'ready') ? '' : 'flex items-center justify-center bg-gray-900'}`}>
-            {(!scanning || cameraStatus === 'loading') && (
+          {/* #qr-scanner div must always be present and EMPTY — 
+              html5-qrcode injects a <video> element directly inside it.
+              Never put children here, never conditionally render this div. */}
+          <div id={QR_SCANNER_ID} className="absolute inset-0" />
+
+          {/* Camera-off overlay (NOT inside #qr-scanner) */}
+          {(!scanning || cameraStatus === 'loading') && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
               <div className="text-center p-8">
                 {cameraStatus === 'loading' ? (
                   <>
@@ -516,8 +521,8 @@ export default function Scan() {
                   </>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Scan overlay */}
           {cameraStatus === 'ready' && scanning && (
