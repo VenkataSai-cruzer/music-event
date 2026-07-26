@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const BRAND_DIR = path.join(__dirname, '..', 'public', 'assets', 'brand');
 const TICKETS_DIR = path.join(__dirname, '..', 'public', 'tickets');
@@ -12,15 +13,13 @@ if (!fs.existsSync(TICKETS_DIR)) {
 
 /**
  * Returns a file:// URL for a brand asset, or empty string if missing.
- * Chromium loads PNGs from disk via file:// URLs in milliseconds —
- * much faster than embedding multi-MB base64 strings in the HTML.
+ * Uses Node.js pathToFileURL() for correct cross-platform file:// format.
+ * Chromium loads PNGs from disk in milliseconds via file:// URLs.
  */
 function logoFileUrl(filename) {
   const filePath = path.join(BRAND_DIR, filename);
   if (!fs.existsSync(filePath)) return '';
-  const absPath = path.resolve(filePath);
-  // file:// URL format (add extra / for Windows paths)
-  return 'file:///' + absPath.replace(/\\/g, '/');
+  return pathToFileURL(path.resolve(filePath)).href;
 }
 
 /**
@@ -83,7 +82,8 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
 
     // page.goto with file:// loads images from disk natively — much faster
-    await page.goto('file:///' + tempHtmlPath.replace(/\\/g, '/'), {
+    // Uses pathToFileURL() for correct Windows/Linux format
+    await page.goto(pathToFileURL(tempHtmlPath).href, {
       waitUntil: ['load', 'networkidle2'],
       timeout: 30000,
     });
