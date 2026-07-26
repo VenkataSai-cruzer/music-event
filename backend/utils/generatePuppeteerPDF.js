@@ -10,42 +10,37 @@ if (!fs.existsSync(TICKETS_DIR)) {
   fs.mkdirSync(TICKETS_DIR, { recursive: true });
 }
 
-function readImageBase64(filePath) {
-  if (!filePath || !fs.existsSync(filePath)) return null;
-  try {
-    const ext = path.extname(filePath).toLowerCase();
-    const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' :
-                 ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
-    const data = fs.readFileSync(filePath).toString('base64');
-    return `data:${mime};base64,${data}`;
-  } catch (e) {
-    return null;
-  }
-}
-
-function loadBrandLogo(filename) {
+/**
+ * Returns a file:// URL for a brand asset, or empty string if missing.
+ * Chromium loads PNGs from disk via file:// URLs in milliseconds —
+ * much faster than embedding multi-MB base64 strings in the HTML.
+ */
+function logoFileUrl(filename) {
   const filePath = path.join(BRAND_DIR, filename);
-  return readImageBase64(filePath) || '';
+  if (!fs.existsSync(filePath)) return '';
+  const absPath = path.resolve(filePath);
+  // file:// URL format (add extra / for Windows paths)
+  return 'file:///' + absPath.replace(/\\/g, '/');
 }
 
 /**
  * Generates a professional A4 ticket PDF using Puppeteer.
- * Loads specific brand assets by filename — no directory scanning.
+ * Brand images loaded via file:// URLs (NOT base64) for speed.
  */
 async function generatePuppeteerPDF(ticket, qrBuffer) {
   const qrBase64 = qrBuffer.toString('base64');
 
-  // Load specific brand assets by known filename
-  const logo7notes = loadBrandLogo('7notes-logo.png');
-  const logoCafooze = loadBrandLogo('cafooze-logo.png');
-  const logoYours = loadBrandLogo('yoursdigital.png');
-  const logoFisandy = loadBrandLogo('fisandy.png');
-  const posterBg = loadBrandLogo('poster.png');
+  // Use file:// URLs instead of base64 — dramatically faster for large PNGs
+  const logo7notes = logoFileUrl('7notes-logo.png');
+  const logoCafooze = logoFileUrl('cafooze-logo.png');
+  const logoYours = logoFileUrl('yoursdigital.png');
+  const logoFisandy = logoFileUrl('fisandy.png');
+  const posterBg = logoFileUrl('poster.png');
 
   let html = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
 
   // Graceful fallback: if a logo is missing, inject CSS to hide its container
-  const hideMissingLogo = (logo) => logo ? '' : 'display:none;';
+  const hideMissingLogo = (url) => url ? '' : 'display:none;';
 
   const replacements = {
     'ATTENDEE_NAME': ticket.name || '',
@@ -70,6 +65,14 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value != null ? String(value) : '');
   }
 
+  // Write HTML to a temp file so we can use page.goto() instead of
+  // page.setContent(). goto() with file:// lets Chrome load images
+  // from disk natively — orders of magnitude faster than base64.
+  const tempDir = path.join(__dirname, '..', 'temp');
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+  const tempHtmlPath = path.join(tempDir, `ticket-${ticket.qr_token}.html`);
+  fs.writeFileSync(tempHtmlPath, html, 'utf-8');
+
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
@@ -79,12 +82,14 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     const page = await browser.newPage();
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
 
-    await page.setContent(html, {
+    // page.goto with file:// loads images from disk natively — much faster
+    await page.goto('file:///' + tempHtmlPath.replace(/\\/g, '/'), {
       waitUntil: ['load', 'networkidle2'],
-      timeout: 45000,
+      timeout: 30000,
     });
 
-    await new Promise(r => setTimeout(r, 1500));
+    // Short settle time (1s is enough when images load from disk)
+    await new Promise(r => setTimeout(r, 1000));
 
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
@@ -96,6 +101,9 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
       margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
       preferCSSPageSize: true,
     });
+
+    // Clean up temp HTML file
+    try { fs.unlinkSync(tempHtmlPath); } catch (_) {}
 
     return `/tickets/${fileName}`;
   } finally {
