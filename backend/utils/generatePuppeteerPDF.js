@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const generateBarcode = require('./generateBarcode');
 
-const TICKET_ARTWORK_PATH = path.join(__dirname, '..', 'public', 'assets', 'brand', 'finalticket.png');
+const BRAND_DIR = path.join(__dirname, '..', 'public', 'assets', 'brand');
 const TICKETS_DIR = path.join(__dirname, '..', 'public', 'tickets');
 const TEMPLATE_PATH = path.join(__dirname, '..', 'templates', 'ticket-template.html');
 
@@ -18,7 +18,14 @@ if (!fs.existsSync(TICKETS_DIR)) {
 
 let cachedBrowser = null;
 let cachedTemplate = null;
-let cachedArtworkBase64 = null;
+let cachedLogos = {};
+
+// Logo files to cache
+const LOGO_FILES = {
+  '7notes': '7notes-logo.png',
+  'yoursdigital': 'yoursdigital.png',
+  'fisandy': 'fisandy.png',
+};
 
 /**
  * Reads an image file and returns it as a base64 data URI.
@@ -43,7 +50,10 @@ function readImageBase64(filePath) {
  * Loads or reloads the cached template and artwork from disk.
  */
 function loadCache() {
-  cachedArtworkBase64 = readImageBase64(TICKET_ARTWORK_PATH);
+  // Cache partner logos for dynamic injection
+  for (const [key, filename] of Object.entries(LOGO_FILES)) {
+    cachedLogos[key] = readImageBase64(path.join(BRAND_DIR, filename));
+  }
 
   if (!fs.existsSync(TEMPLATE_PATH)) {
     throw new Error(`Template not found at: ${TEMPLATE_PATH}`);
@@ -85,17 +95,20 @@ process.on('SIGINT', () => closeBrowser());
 // ══════════════════════════════════════════════════
 
 /**
- * Generates a landscape ticket PDF using the exact aspect ratio of the
- * approved artwork (1536×1024 — 3:2 landscape). The artwork is used as a
- * fixed background, and only dynamic fields are overlaid on top.
+ * Generates a premium landscape concert ticket PDF (3:2 ratio, 6×4 inch).
  *
- * Rendering approach:
- * 1. The approved ticket artwork (finalticket.png) is used as a fixed background.
- * 2. Dynamic fields (name, gender, email, mobile, ticket ID) are overlaid
- *    at exact pixel coordinates matching the artwork.
- * 3. QR code (PNG) and Code128 barcode (SVG) are generated as images and overlaid.
- * 4. The template, artwork, and Chrome browser are all cached in memory.
- * 5. PDF page is sized to match the artwork exactly — no scaling, no margins.
+ * The ticket is a pure HTML+CSS design with:
+ * - Abstract concert background (CSS gradients)
+ * - Left 65%: event branding (7 NOTES, venue, date, partner logos)
+ * - Right 35%: attendee info panel (name, gender, email, mobile, QR, barcode)
+ * - Gold accents, dark theme, glass-effect panel
+ * - Partner logos loaded from brand assets and injected as base64
+ * - Google Fonts (Oswald + Inter) with system font fallbacks
+ *
+ * Caching strategy:
+ * - Chrome browser: launched once, reused for all generations
+ * - HTML template: loaded from disk at module init, string-replaced per request
+ * - Logos: loaded as base64 at module init, injected into template
  *
  * @param {Object} ticket - Ticket object with name, gender, email, mobile, ticket_id, qr_token.
  * @param {Buffer} qrBuffer - PNG buffer for the QR code.
@@ -107,17 +120,13 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   // Generate Code128 barcode as SVG data URI from Ticket ID
   const barcodeDataUri = await generateBarcode(ticket.ticket_id);
 
-  if (!cachedArtworkBase64) {
-    // Artwork wasn't cached at load time, try loading now
+  // Ensure logos are cached
+  if (!cachedLogos['7notes']) {
     loadCache();
-    if (!cachedArtworkBase64) {
-      throw new Error('Final ticket artwork not found. Ensure finalticket.png exists in public/assets/brand/');
-    }
   }
 
-  // Build replacements map with cached artwork (no disk I/O per request)
+  // Build replacements map with cached resources (no disk I/O per request)
   const replacements = {
-    'BACKGROUND_BASE64': cachedArtworkBase64,
     'ATTENDEE_NAME': ticket.name || '',
     'ATTENDEE_GENDER': ticket.gender || '',
     'ATTENDEE_EMAIL': ticket.email || '',
@@ -125,6 +134,9 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     'TICKET_ID': ticket.ticket_id || '',
     'QR_BASE64': qrBase64,
     'BARCODE_BASE64': barcodeDataUri,
+    'LOGO_7NOTES': cachedLogos['7notes'] || '',
+    'LOGO_YOURSDIGITAL': cachedLogos['yoursdigital'] || '',
+    'LOGO_FISANDY': cachedLogos['fisandy'] || '',
   };
 
   // Apply replacements to cached template (fast string replace, no disk I/O)

@@ -10,8 +10,8 @@ async function generateQR(qrToken) {
   return QRCode.toBuffer(qrToken, {
     color: { dark: '#1a1a2e', light: '#ffffff' },
     errorCorrectionLevel: 'H',
-    width: 600,
-    margin: 4,
+    width: 290,
+    margin: 2,
     type: 'png',
   });
 }
