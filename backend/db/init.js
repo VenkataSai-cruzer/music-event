@@ -45,27 +45,37 @@ const createTables = async () => {
       console.log('Seeded 3 default scanner accounts (gate_a, gate_b, vip / password: scan123)');
     }
 
-    // ── Migration: clean up old schema (runs once, idempotent) ──
+    // ── Migration: clean up old schema and stale data ──
     try {
-      // Check if migration already ran — old event_date column exists?
-      const checkCol = await pool.query(`
+      // Phase 1: Drop old columns from previous schema if they still exist
+      const colCheck = await pool.query(`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'tickets' AND column_name = 'event_date'
       `);
-      const needsMigration = checkCol.rows.length > 0;
-
-      if (needsMigration) {
-        // First-time migration from old schema: drop old columns and clear stale data
+      if (colCheck.rows.length > 0) {
         await pool.query(`ALTER TABLE tickets DROP COLUMN event_date;`);
         await pool.query(`ALTER TABLE tickets DROP COLUMN event_address;`);
         await pool.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS qr_path;`);
         await pool.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS updated_at;`);
-        await pool.query(`DELETE FROM tickets;`);
         await pool.query(`ALTER TABLE tickets DROP CONSTRAINT IF EXISTS tickets_status_check;`);
         await pool.query(`ALTER TABLE tickets ADD CONSTRAINT tickets_status_check CHECK (status IN ('VALID', 'USED'));`);
-        console.log('Migration: old schema cleaned up, old ticket data cleared');
-      } else {
-        console.log('Migration: schema already up to date');
+        console.log('Migration: old columns cleaned up');
+      }
+
+      // Phase 2: Clear old ticket data — only if old tables still exist (truly once-only)
+      // Using activity_log/event_settings existence as marker means:
+      //   - Old database: tables exist → DELETE tickets + drop tables → done
+      //   - Fresh database: tables never existed → skip → safe
+      //   - Post-migration restart: tables already dropped → skip → live tickets safe
+      const oldTables = await pool.query(`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_name IN ('activity_log', 'event_settings')
+        LIMIT 1
+      `);
+      if (oldTables.rows.length > 0) {
+        const countRes = await pool.query('SELECT COUNT(*) FROM tickets');
+        await pool.query(`DELETE FROM tickets;`);
+        console.log('Migration: cleared ' + countRes.rows[0].count + ' stale ticket(s) from old schema');
       }
     } catch (migrateErr) {
       console.log('Migration note:', migrateErr.message);
