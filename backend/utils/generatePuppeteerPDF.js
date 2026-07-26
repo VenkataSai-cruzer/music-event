@@ -34,7 +34,6 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   const logoCafooze = logoFileUrl('cafooze-logo.png');
   const logoYours = logoFileUrl('yoursdigital.png');
   const logoFisandy = logoFileUrl('fisandy.png');
-  const posterBg = logoFileUrl('poster.png');
 
   let html = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
 
@@ -52,12 +51,10 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     'LOGO_CAFOOZE': logoCafooze,
     'LOGO_YOURSDIGITAL': logoYours,
     'LOGO_FISANDY': logoFisandy,
-    'POSTER_BG': posterBg,
     'HIDE_7NOTES': hideMissingLogo(logo7notes),
     'HIDE_CAFOOZE': hideMissingLogo(logoCafooze),
     'HIDE_YOURS': hideMissingLogo(logoYours),
     'HIDE_FISANDY': hideMissingLogo(logoFisandy),
-    'HIDE_POSTER': hideMissingLogo(posterBg),
   };
 
   for (const [key, value] of Object.entries(replacements)) {
