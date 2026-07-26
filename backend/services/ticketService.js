@@ -191,6 +191,32 @@ async function getDashboardStats() {
   };
 }
 
+/**
+ * Gets all scan logs (USED tickets with scan details), ordered by most recent.
+ */
+async function getScanLogs({ page = 1, limit = 30 }) {
+  const offset = (page - 1) * limit;
+
+  const countResult = await pool.query(
+    "SELECT COUNT(*) FROM tickets WHERE status = 'USED' AND scanned_at IS NOT NULL"
+  );
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  const result = await pool.query(
+    `SELECT ticket_id, name, mobile, status, scanned_at, scanned_by, created_at
+     FROM tickets
+     WHERE status = 'USED' AND scanned_at IS NOT NULL
+     ORDER BY scanned_at DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+
+  return {
+    logs: result.rows,
+    pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+  };
+}
+
 module.exports = {
   createTicket,
   getAllTickets,
@@ -201,4 +227,5 @@ module.exports = {
   deleteTicket,
   regeneratePDF,
   getDashboardStats,
+  getScanLogs,
 };

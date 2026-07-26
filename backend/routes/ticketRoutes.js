@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 
 const {
   createTicket, getAllTickets, getDashboard,
-  downloadTicket, useTicket, deleteTicket,
+  downloadTicket, useTicket, deleteTicket, getScanLogs,
 } = require('../controllers/ticketController');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
@@ -23,6 +23,7 @@ function requireAuth(req, res, next) {
 
 // ── PROTECTED ROUTES ──
 router.get('/dashboard', requireAuth, getDashboard);
+router.get('/scan-logs', requireAuth, getScanLogs);
 router.post('/', requireAuth, createTicket);
 router.get('/', requireAuth, getAllTickets);
 router.put('/use/:ticketId', requireAuth, useTicket);

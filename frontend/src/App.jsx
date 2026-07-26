@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tickets from './pages/Tickets';
 import CreateTicket from './pages/CreateTicket';
 import Scan from './pages/Scan';
+import ScanLogs from './pages/ScanLogs';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/create" element={<CreateTicket />} />
+          <Route path="scan-logs" element={<ScanLogs />} />
           <Route path="scan" element={<Scan />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

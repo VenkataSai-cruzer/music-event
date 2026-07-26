@@ -4,6 +4,7 @@ import {
   Ticket,
   PlusCircle,
   ScanQrCode,
+  History,
   LogOut,
   Music,
   X,
@@ -21,6 +22,7 @@ export default function Sidebar({ onLogout, onClose, mobileOpen }) {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/tickets', icon: Ticket, label: 'Tickets' },
     { to: '/tickets/create', icon: PlusCircle, label: 'Create Ticket' },
+    { to: '/scan-logs', icon: History, label: 'Scan Logs' },
     { to: '/scan', icon: ScanQrCode, label: 'Scan QR' },
   ];
 

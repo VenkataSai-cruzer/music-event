@@ -18,4 +18,6 @@ export const ticketService = {
   useTicket: (ticketId) => api.put(`/tickets/use/${ticketId}`),
 
   delete: (ticketId) => api.delete(`/tickets/${ticketId}`),
+
+  getScanLogs: (params = {}) => api.get('/tickets/scan-logs', { params }),
 };

@@ -164,4 +164,21 @@ async function deleteTicket(req, res, next) {
   }
 }
 
-module.exports = { createTicket, getAllTickets, getDashboard, downloadTicket, verifyTicket, useTicket, deleteTicket };
+/**
+ * GET /api/tickets/scan-logs
+ * Returns paginated scan logs (USED tickets with scan details).
+ */
+async function getScanLogs(req, res, next) {
+  try {
+    const { page, limit } = req.query;
+    const result = await ticketService.getScanLogs({
+      page: parseInt(page, 10) || 1,
+      limit: parseInt(limit, 10) || 30,
+    });
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { createTicket, getAllTickets, getDashboard, downloadTicket, verifyTicket, useTicket, deleteTicket, getScanLogs };
