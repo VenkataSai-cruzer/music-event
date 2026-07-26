@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>7 NOTES Concert Pass</title>
+<style>
+  @page {
+    size: 1536px 1024px;
+    margin: 0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1536px;
+    height: 1024px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ═══ FIXED BACKGROUND ARTWORK ═══ */
+  .bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1536px;
+    height: 1024px;
+    z-index: 0;
+  }
+
+  /* ═══ DYNAMIC OVERLAYS ═══ */
+  .field {
+    position: absolute;
+    z-index: 1;
+    color: #ffffff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.1;
+  }
+
+  /* Name — at (1180, 125), w=280, h=45 */
+  .field-name {
+    left: 1180px;
+    top: 125px;
+    width: 280px;
+    height: 45px;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* Gender — at (1180, 255), w=280, h=45 */
+  .field-gender {
+    left: 1180px;
+    top: 255px;
+    width: 280px;
+    height: 45px;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  /* Email — at (1180, 390), w=280, h=45 */
+  .field-email {
+    left: 1180px;
+    top: 390px;
+    width: 280px;
+    height: 45px;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* Mobile — at (1180, 535), w=280, h=45 */
+  .field-mobile {
+    left: 1180px;
+    top: 535px;
+    width: 280px;
+    height: 45px;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  /* Ticket ID — at (760, 790), w=260, h=55, below QR */
+  .field-ticketid {
+    left: 760px;
+    top: 790px;
+    width: 260px;
+    height: 55px;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-align: center;
+  }
+
+  /* ═══ QR CODE OVERLAY ═══ */
+  /* QR area: (720, 455), w=250, h=250. QR with 20px padding = 210×210 */
+  .qr-overlay {
+    position: absolute;
+    left: 740px;
+    top: 475px;
+    width: 210px;
+    height: 210px;
+    z-index: 1;
+  }
+
+  /* ═══ BARCODE OVERLAY ═══ */
+  /* Barcode area: (730, 835), w=260, h=90. Barcode fills box with 4px padding */
+  .barcode-overlay {
+    position: absolute;
+    left: 734px;
+    top: 839px;
+    width: 252px;
+    height: 82px;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+  <!-- The fixed final artwork — never changes -->
+  <img class="bg" src="{{BACKGROUND_BASE64}}" alt="" />
+
+  <!-- Dynamic fields — only these values change -->
+  <div class="field field-name">{{ATTENDEE_NAME}}</div>
+  <div class="field field-gender">{{ATTENDEE_GENDER}}</div>
+  <div class="field field-email">{{ATTENDEE_EMAIL}}</div>
+  <div class="field field-mobile">{{ATTENDEE_MOBILE}}</div>
+  <div class="field field-ticketid">{{TICKET_ID}}</div>
+
+  <!-- QR Code + Barcode overlays -->
+  <img class="qr-overlay" src="data:image/png;base64,{{QR_BASE64}}" alt="QR" />
+  <img class="barcode-overlay" src="{{BARCODE_BASE64}}" alt="Barcode" />
+</body>
+</html>
