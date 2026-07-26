@@ -3,8 +3,6 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { ticketService } from '../services/ticketService';
-
 const QR_SCANNER_ID = 'qr-scanner';
 const RESULT_DISPLAY_MS = 4000;
 const POLL_INTERVAL_MS = 10000;
@@ -67,10 +65,10 @@ export default function Scan() {
     } catch (e) { /* silent */ }
   }, []);
 
-  // ── Counter polling ──
+  // ── Counter polling (uses raw axios — bypasses admin auth interceptor) ──
   const fetchCounter = useCallback(async () => {
     try {
-      const res = await ticketService.getDashboard();
+      const res = await axios.get(`${API_URL}/api/scanner/stats`);
       setCounter({ used: res.data.used || 0, remaining: res.data.remaining || 0, total: res.data.total || 0 });
     } catch (e) { /* silent */ }
   }, []);
@@ -102,7 +100,10 @@ export default function Scan() {
   const handleVerifyScan = useCallback(async (decodedText) => {
     try {
       const scannedBy = getScannedBy();
-      const res = await ticketService.verify(decodedText, scannedBy);
+      // Use raw axios to bypass admin auth interceptor
+      const res = await axios.post(`${API_URL}/api/tickets/verify`, {
+        qr_token: decodedText, scanned_by: scannedBy
+      });
 
       if (res.data.action === 'approved') {
         playSound('success');

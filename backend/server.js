@@ -55,6 +55,20 @@ app.post('/api/auth/scanner-login', (req, res, next) => {
   scannerLogin(req, res, next);
 });
 
+// Public scanner stats endpoint (no auth — used by scanner for entry counts)
+app.get('/api/scanner/stats', async (req, res, next) => {
+  try {
+    const pool = require('./db/db');
+    const total = await pool.query('SELECT COUNT(*) FROM tickets');
+    const used = await pool.query("SELECT COUNT(*) FROM tickets WHERE status = 'USED'");
+    const totalCount = parseInt(total.rows[0].count, 10);
+    const usedCount = parseInt(used.rows[0].count, 10);
+    res.json({ total: totalCount, used: usedCount, remaining: totalCount - usedCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ── Logging ──
 app.use(morgan('dev'));
 
