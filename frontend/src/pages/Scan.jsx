@@ -36,6 +36,18 @@ export default function Scan() {
   const pollTimerRef = useRef(null);
   const onScanSuccessRef = useRef(null);
 
+  // ── Lazy scanner — only creates Html5Qrcode when Start is clicked ──
+  const getScanner = useCallback(() => {
+    if (!scannerRef.current) {
+      try {
+        scannerRef.current = new Html5Qrcode(QR_SCANNER_ID);
+      } catch (e) {
+        console.error('Failed to create scanner:', e);
+      }
+    }
+    return scannerRef.current;
+  }, []);
+
   // ── Sound effects ──
   const playSound = useCallback((type) => {
     try {
@@ -84,16 +96,6 @@ export default function Scan() {
     return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
   }, [loggedIn, fetchCounter]);
 
-  // ── Scanner init ──
-  useEffect(() => {
-    const scanner = new Html5Qrcode(QR_SCANNER_ID);
-    scannerRef.current = scanner;
-    return () => {
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-      if (scanner && scanningRef.current) scanner.stop().catch(() => {});
-    };
-  }, []);
-
   const getScannedBy = useCallback(() => scannerInfo?.display_name || 'Scanner', [scannerInfo]);
 
   // ── Atomic verify+approve ──
@@ -121,7 +123,8 @@ export default function Scan() {
   useEffect(() => {
     onScanSuccessRef.current = (decodedText) => {
       setProcessing(true);
-      scannerRef.current.stop().catch(() => {});
+      const s = scannerRef.current;
+      if (s) s.stop().catch(() => {});
       setScanning(false);
       handleVerifyScan(decodedText);
     };
@@ -136,15 +139,21 @@ export default function Scan() {
       startScanner();
     }, RESULT_DISPLAY_MS);
     return () => { if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current); };
-  }, [result]);
+  }, [result, startScanner]);
 
   const startScanner = useCallback(async () => {
+    const scanner = getScanner();
+    if (!scanner) {
+      toast.error('Scanner initialization failed');
+      setScanning(false);
+      return;
+    }
     setScanning(true);
     scanningRef.current = true;
     setResult(null);
     setCameraReady(false);
     try {
-      await scannerRef.current.start(
+      await scanner.start(
         { facingMode: 'environment' },
         { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
         (decodedText) => onScanSuccessRef.current?.(decodedText),
@@ -153,7 +162,7 @@ export default function Scan() {
       setCameraReady(true);
     } catch (err) {
       try {
-        await scannerRef.current.start(
+        await scanner.start(
           { facingMode: 'user' },
           { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
           (decodedText) => onScanSuccessRef.current?.(decodedText),
@@ -165,13 +174,23 @@ export default function Scan() {
         setScanning(false);
       }
     }
-  }, []);
+  }, [getScanner]);
 
   const stopScanner = useCallback(async () => {
     scanningRef.current = false;
     try { if (scannerRef.current) await scannerRef.current.stop(); } catch (e) {}
     setScanning(false);
     setCameraReady(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      if (scannerRef.current && scanningRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
   }, []);
 
   // ── Scanner Login ──
