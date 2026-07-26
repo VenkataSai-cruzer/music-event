@@ -50,11 +50,6 @@ app.post('/api/tickets/verify', (req, res, next) => {
   const ticketController = require('./controllers/ticketController');
   ticketController.verifyTicket(req, res, next);
 });
-app.post('/api/auth/scanner-login', (req, res, next) => {
-  const { scannerLogin } = require('./controllers/scannerAuthController');
-  scannerLogin(req, res, next);
-});
-
 // Public scanner stats endpoint (no auth — used by scanner for entry counts)
 app.get('/api/scanner/stats', async (req, res, next) => {
   try {
