@@ -20,8 +20,14 @@ export default function Scan() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [scannerInfo, setScannerInfo] = useState(() => {
-    const saved = sessionStorage.getItem('scannerInfo');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = sessionStorage.getItem('scannerInfo');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      // Previous version may have stored non-JSON data — clean it up
+      sessionStorage.removeItem('scannerInfo');
+      return null;
+    }
   });
 
   const scannerRef = useRef(null);
