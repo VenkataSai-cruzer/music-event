@@ -45,6 +45,30 @@ const createTables = async () => {
       console.log('Seeded 3 default scanner accounts (gate_a, gate_b, vip / password: scan123)');
     }
 
+    // ── Migration: drop old columns from previous schema ──
+    // The old tickets table had event_date, event_address, qr_path columns with NOT NULL
+    // which conflict with the simplified single-event schema.
+    // These are idempotent — safe to run every startup.
+    try {
+      await pool.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS event_date;`);
+      await pool.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS event_address;`);
+      await pool.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS qr_path;`);
+      await pool.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS updated_at;`);
+      // Drop old CHECK constraint that included CANCELLED if it exists
+      // First, convert any CANCELLED tickets so the new constraint doesn't fail
+      await pool.query(`UPDATE tickets SET status = 'USED' WHERE status = 'CANCELLED';`);
+      await pool.query(`ALTER TABLE tickets DROP CONSTRAINT IF EXISTS tickets_status_check;`);
+      await pool.query(`ALTER TABLE tickets ADD CONSTRAINT tickets_status_check CHECK (status IN ('VALID', 'USED'));`);
+      console.log('Migration: old columns cleaned up');
+    } catch (migrateErr) {
+      // Non-fatal — table might not have old columns
+      console.log('Migration note:', migrateErr.message);
+    }
+
+    // Drop unused tables from old schema
+    await pool.query(`DROP TABLE IF EXISTS activity_log;`);
+    await pool.query(`DROP TABLE IF EXISTS event_settings;`);
+
     console.log('Database tables initialized successfully');
   } catch (err) {
     console.error('Error initializing database tables:', err);
