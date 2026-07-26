@@ -1,658 +1,492 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>7 NOTES — Entry Ticket</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>7 NOTES Ticket</title>
 <style>
-  /* ── Reset ── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-  /* ── Theme ── */
-  :root {
-    --gold: #d4a843;
-    --gold-light: #f0d78c;
-    --gold-dark: #b8922e;
-    --dark: #0a0a0e;
-    --dark-card: #12121a;
-    --dark-surface: #1a1a28;
-    --text: #ffffff;
-    --text-muted: rgba(255,255,255,0.5);
-    --text-dim: rgba(255,255,255,0.25);
-    --accent-orange: #e8922e;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 0;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    width: 210mm;
-    height: 297mm;
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    background: var(--dark);
-    color: var(--text);
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+    background: #0a0a0f;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
   }
 
-  /* ── Outer Container ── */
   .ticket {
-    width: 210mm;
-    height: 297mm;
-    position: relative;
+    width: 780px;
+    background: #0d0d1a;
+    border-radius: 16px;
     overflow: hidden;
-    background:
-      radial-gradient(ellipse 80% 40% at 50% 15%, rgba(212, 168, 67, 0.06) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 30% at 80% 70%, rgba(232, 146, 46, 0.04) 0%, transparent 60%),
-      linear-gradient(170deg, #0a0a0e 0%, #0f0f18 35%, #12121a 65%, #0a0a0e 100%);
+    position: relative;
+    box-shadow: 0 0 100px rgba(245, 158, 11, 0.08);
   }
 
-  /* Subtle music note pattern overlay */
+  /* Poster watermark background */
+  .poster-watermark {
+    {{HIDE_POSTER}}
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('{{POSTER_BG}}');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.035;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Gold top border */
   .ticket::before {
-    content: '♪ ♫ ♪ ♫ ♪ ♫ ♪ ♫';
-    position: absolute;
-    top: 60px;
-    right: -20px;
-    font-size: 48px;
-    letter-spacing: 30px;
-    color: rgba(212, 168, 67, 0.03);
-    transform: rotate(-15deg);
-    white-space: nowrap;
-    pointer-events: none;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-  .ticket::after {
-    content: '♫ ♪ ♫ ♪ ♫ ♪ ♫ ♪';
-    position: absolute;
-    bottom: 120px;
-    left: -30px;
-    font-size: 40px;
-    letter-spacing: 25px;
-    color: rgba(212, 168, 67, 0.03);
-    transform: rotate(10deg);
-    white-space: nowrap;
-    pointer-events: none;
-    font-family: 'Segoe UI', Arial, sans-serif;
-  }
-
-  /* ── Gold Border Accents ── */
-  .border-top {
+    content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 4px;
-    background: linear-gradient(90deg, transparent 5%, var(--gold) 20%, var(--gold-light) 50%, var(--gold) 80%, transparent 95%);
-    z-index: 2;
-  }
-  .border-bottom {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, transparent 5%, var(--gold) 20%, var(--gold-light) 50%, var(--gold) 80%, transparent 95%);
+    background: linear-gradient(90deg, #b8860b, #fbbf24, #d97706, #f59e0b, #b8860b);
     z-index: 2;
   }
 
-  /* ── Main Card ── */
-  .card {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
-    background: linear-gradient(160deg, rgba(18,18,26,0.98) 0%, rgba(14,14,22,0.98) 100%);
-    border: 1px solid rgba(212, 168, 67, 0.15);
-    border-radius: 18px;
-    padding: 28px 32px 22px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  .divider {
+    margin: 0 44px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.15), transparent);
   }
 
-  /* ── Header ── */
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+  /* ═══ HERO ═══ */
+  .hero {
+    padding: 32px 44px 18px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
   }
 
-  .brand {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .brand-subtitle {
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 4.5px;
-    color: var(--gold);
+  .hero-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 100px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 4px;
     text-transform: uppercase;
+    color: #fbbf24;
+    margin-bottom: 14px;
+  }
+
+  .hero-logo {
+    max-width: 320px;
+    max-height: 80px;
+    display: block;
+    margin: 0 auto 10px;
+    object-fit: contain;
+  }
+
+  .hero-tagline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 5px;
+    text-transform: uppercase;
+  }
+
+  .hero-tagline em {
+    font-style: normal;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  /* ═══ ATTENDEE ═══ */
+  .attendee {
+    padding: 16px 44px 14px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .section-label {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.2);
+    margin-bottom: 10px;
+  }
+
+  .attendee-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .att-field {
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(245, 158, 11, 0.06);
+    border-radius: 8px;
+  }
+
+  .att-label {
+    font-size: 7px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(245, 158, 11, 0.4);
     margin-bottom: 1px;
   }
 
-  .brand-name {
-    font-family: 'Impact', 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 54px;
-    font-weight: 900;
-    line-height: 0.95;
-    letter-spacing: 4px;
-    color: #ffffff;
+  .att-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  /* ═══ CAFOOZE — MASSIVE CENTERPIECE ═══ */
+  .cafooze-block {
+    padding: 28px 44px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.04) 0%, transparent 70%);
+  }
+
+  .cafooze-gold-line {
+    width: 60%;
+    margin: 0 auto 18px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.25), rgba(245, 158, 11, 0.4), rgba(245, 158, 11, 0.25), transparent);
+  }
+
+  .cafooze-logo-wrap {
+    {{HIDE_CAFOOZE}}
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .cafooze-logo {
+    max-width: 360px;
+    max-height: 90px;
+    object-fit: contain;
+  }
+
+  .cafooze-addr {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.25);
+    line-height: 1.6;
+    letter-spacing: 2px;
+    font-weight: 300;
+  }
+
+  .cafooze-addr strong {
+    color: rgba(255, 255, 255, 0.35);
+    font-weight: 400;
+  }
+
+  .cafooze-gold-line-bottom {
+    width: 60%;
+    margin: 18px auto 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.25), rgba(245, 158, 11, 0.4), rgba(245, 158, 11, 0.25), transparent);
+  }
+
+  /* ═══ META ROW ═══ */
+  .meta-row {
+    display: flex;
+    justify-content: center;
+    gap: 36px;
+    padding: 14px 44px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .meta-item {
+    text-align: center;
+  }
+
+  .meta-label {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    text-shadow: 0 2px 20px rgba(212, 168, 67, 0.15);
+    color: rgba(255, 255, 255, 0.2);
     margin-bottom: 3px;
   }
 
-  .brand-tagline {
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 8px;
-    font-weight: 400;
-    letter-spacing: 3.5px;
-    color: rgba(212, 168, 67, 0.55);
-    text-transform: uppercase;
-  }
-
-  .status-badge {
-    padding: 5px 16px;
-    border-radius: 20px;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    white-space: nowrap;
-    margin-top: 4px;
-  }
-  .status-badge.valid {
-    border: 1.5px solid rgba(34, 197, 94, 0.4);
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.08);
-  }
-  .status-badge.used {
-    border: 1.5px solid rgba(245, 158, 11, 0.4);
-    color: #f59e0b;
-    background: rgba(245, 158, 11, 0.08);
-  }
-  .status-badge.cancelled {
-    border: 1.5px solid rgba(239, 68, 68, 0.4);
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.08);
-  }
-
-  /* ── Divider ── */
-  .divider {
-    width: 100%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(212, 168, 67, 0.3) 15%, rgba(212, 168, 67, 0.5) 50%, rgba(212, 168, 67, 0.3) 85%, transparent 100%);
-    margin: 10px 0;
-  }
-
-  /* ── Main Grid ── */
-  .main-grid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 16px;
-    min-height: 0;
-  }
-
-  /* ── Left Panel: Event Info ── */
-  .left-panel {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-  }
-
-  .info-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
-  }
-  .info-row:last-child { border-bottom: none; }
-
-  .info-icon {
-    width: 28px;
-    height: 28px;
-    background: rgba(212, 168, 67, 0.08);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .info-icon svg { width: 14px; height: 14px; fill: none; stroke: var(--gold); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-  .info-content { display: flex; flex-direction: column; }
-  .info-label {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 6.5px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-  }
-  .info-value {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1.3;
-  }
-  .info-value.sub {
-    font-size: 9px;
-    font-weight: 400;
-    opacity: 0.7;
-    line-height: 1.35;
-  }
-
-  /* ── Right Panel: Attendee ── */
-  .right-panel {
-    position: relative;
-    border-radius: 14px;
-    overflow: hidden;
-    background: linear-gradient(145deg, rgba(212, 168, 67, 0.08) 0%, rgba(212, 168, 67, 0.02) 60%, transparent 100%);
-    border: 1px solid rgba(212, 168, 67, 0.12);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .section-title {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 2.5px;
-    color: var(--gold);
-    text-transform: uppercase;
-  }
-
-  .attendee-field {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-  .attendee-field:last-child { border-bottom: none; }
-
-  .field-label {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 7px;
-    font-weight: 600;
-    letter-spacing: 1.2px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    flex-shrink: 0;
-  }
-
-  .field-value {
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 9.5px;
-    font-weight: 500;
-    color: #fff;
-    text-align: right;
-    max-width: 58%;
-    word-break: break-word;
-    line-height: 1.3;
-  }
-  .field-value.name {
+  .meta-value {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 13px;
-    font-weight: 700;
-    color: var(--gold-light);
-  }
-  .field-value.ticket-id {
-    font-family: 'Courier New', 'Consolas', monospace;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: var(--gold);
-  }
-
-  /* ── Bottom Section ── */
-  .bottom-section {
-    display: flex;
-    gap: 20px;
-    padding-top: 6px;
-    margin-top: auto;
-    align-items: stretch;
-  }
-
-  /* QR Area */
-  .qr-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    flex-shrink: 0;
-  }
-  .qr-area img {
-    width: 275px;
-    height: 275px;
-    border-radius: 14px;
-    background: #ffffff;
-    padding: 14px;
-    box-shadow: 0 0 30px rgba(212, 168, 67, 0.08);
-  }
-  .qr-label {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 6.5px;
-    font-weight: 700;
-    letter-spacing: 2.5px;
-    color: rgba(212, 168, 67, 0.5);
-    text-transform: uppercase;
-  }
-
-  .qr-security {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 5.5px;
-    color: var(--text-dim);
-    text-align: center;
-    line-height: 1.4;
-    max-width: 260px;
-  }
-
-  /* Barcode Area */
-  .barcode-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .barcode-box {
-    background: #ffffff;
-    border-radius: 10px;
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  .barcode-box svg {
-    max-width: 100%;
-    height: 44px;
-  }
-  .barcode-id {
-    font-family: 'Courier New', 'Consolas', monospace;
-    font-size: 9px;
     font-weight: 600;
-    color: #1a1a2e;
-    letter-spacing: 1px;
+    color: #fff;
+  }
+
+  .meta-value.gold {
+    color: #fbbf24;
+  }
+
+  /* ═══ QR ═══ */
+  .qr-area {
+    padding: 14px 44px 18px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .qr-label {
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.2);
+    margin-bottom: 10px;
+  }
+
+  .qr-box {
+    display: inline-block;
+    padding: 12px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
+    margin-bottom: 8px;
+  }
+
+  .qr-box img {
+    display: block;
+    width: 250px;
+    height: 250px;
+  }
+
+  .qr-ticket-id {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ═══ BARCODE ═══ */
+  .barcode {
+    padding: 0 44px 14px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .barcode-bars {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    height: 32px;
+    align-items: flex-end;
+  }
+
+  .barcode-bars .bar {
+    width: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 1px;
+  }
+
+  .barcode-bars .bar:nth-child(odd) { height: 20px; }
+  .barcode-bars .bar:nth-child(even) { height: 32px; }
+  .barcode-bars .bar:nth-child(3n) { height: 26px; }
+  .barcode-bars .bar:nth-child(5n) { height: 14px; }
+  .barcode-bars .bar:nth-child(7n) { height: 28px; }
+
+  .barcode-id {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.1);
     margin-top: 4px;
   }
-  .barcode-label {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 6px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    color: var(--text-dim);
-    text-transform: uppercase;
+
+  /* ═══ PARTNERS ═══ */
+  .partners {
+    padding: 14px 44px 16px;
+    border-top: 1px solid rgba(245, 158, 11, 0.06);
     text-align: center;
-    margin-top: 2px;
+    position: relative;
+    z-index: 1;
   }
 
-  /* ── Partner Logos Row ── */
-  .partner-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 6px 0 4px;
-    border-top: 1px solid rgba(212, 168, 67, 0.08);
-    margin-top: 6px;
-  }
-
-  .partner-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .partner-icon {
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    background: rgba(212, 168, 67, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Impact', 'Arial Black', sans-serif;
-    font-size: 8px;
-    color: var(--gold);
-    flex-shrink: 0;
-  }
-  .partner-icon img {
-    width: 22px;
-    height: 22px;
-    object-fit: contain;
-    border-radius: 4px;
-  }
-  .partner-label {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 5.5px;
+  .partners-label {
+    font-size: 7px;
     font-weight: 500;
-    color: var(--text-dim);
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    line-height: 1.2;
-    max-width: 55px;
+    color: rgba(255, 255, 255, 0.12);
+    margin-bottom: 10px;
   }
 
-  /* ── Footer ── */
-  .footer {
-    text-align: center;
-    margin-top: auto;
-    padding-top: 6px;
-  }
-
-  .footer-terms {
+  .partners-logos {
     display: flex;
     justify-content: center;
-    gap: 14px;
+    align-items: center;
+    gap: 32px;
     flex-wrap: wrap;
   }
-  .footer-terms span {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 5.5px;
-    font-weight: 600;
-    color: var(--text-dim);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-  }
-  .footer-terms .dot {
-    color: rgba(212, 168, 67, 0.3);
+
+  .partner-logo {
+    max-height: 30px;
+    max-width: 120px;
+    object-fit: contain;
+    opacity: 0.5;
+    filter: brightness(0) invert(0.7);
+    transition: opacity 0.2s;
   }
 
-  .footer-motto {
-    font-family: 'Impact', 'Arial Black', sans-serif;
-    font-size: 14px;
-    letter-spacing: 4px;
-    color: rgba(212, 168, 67, 0.35);
-    margin-top: 4px;
-    text-transform: uppercase;
+  /* ═══ FOOTER ═══ */
+  .footer {
+    padding: 0 44px 20px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
   }
 
-  .footer-meta {
-    font-family: 'Courier New', monospace;
-    font-size: 5.5px;
-    color: rgba(255,255,255,0.1);
-    margin-top: 3px;
+  .footer-text {
+    font-size: 7px;
+    color: rgba(255, 255, 255, 0.07);
+    line-height: 1.5;
     letter-spacing: 0.5px;
   }
 
-  /* ── Print ── */
   @media print {
-    body { background: var(--dark); margin: 0; padding: 0; }
-    .card { break-inside: avoid; page-break-inside: avoid; }
+    body { padding: 0; background: #0d0d1a; }
+    .ticket { box-shadow: none; border-radius: 0; width: 100%; }
+    .hero-logo, .partner-logo { filter: none !important; opacity: 0.7 !important; }
   }
 </style>
 </head>
 <body>
+
 <div class="ticket">
-  <div class="border-top"></div>
-  <div class="border-bottom"></div>
 
-  <div class="card">
-    <!-- ═══ HEADER ═══ -->
-    <div class="header">
-      <div class="brand">
-        <div class="brand-subtitle">Live Jamming Session</div>
-        <div class="brand-name">7 NOTES</div>
-        <div class="brand-tagline">Feel It. Live It. Be It.</div>
-      </div>
-      <div class="status-badge {{STATUS_CLASS}}">{{STATUS_LABEL}}</div>
+  <!-- Poster background watermark -->
+  <div class="poster-watermark"></div>
+
+  <!-- ═══ HERO ═══ -->
+  <div class="hero">
+    <div class="hero-badge">Live Jamming Session</div>
+    <div class="hero-logo-wrap" style="{{HIDE_7NOTES}}">
+      <img class="hero-logo" src="{{LOGO_7NOTES}}" alt="7 NOTES" />
     </div>
+    <p class="hero-tagline"><em>Feel It</em> &nbsp;&bull;&nbsp; <em>Live It</em> &nbsp;&bull;&nbsp; <em>Be It</em></p>
+  </div>
 
-    <div class="divider"></div>
+  <div class="divider"></div>
 
-    <!-- ═══ MAIN CONTENT ═══ -->
-    <div class="main-grid">
-      <!-- Left: Event Information -->
-      <div class="left-panel">
-        <div class="info-row">
-          <div class="info-icon">
-            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <div class="info-content">
-            <span class="info-label">Date</span>
-            <span class="info-value">Saturday, 8 August 2026</span>
-          </div>
-        </div>
-
-        <div class="info-row">
-          <div class="info-icon">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <div class="info-content">
-            <span class="info-label">Time</span>
-            <span class="info-value">5:30 PM — 9:00 PM</span>
-          </div>
-        </div>
-
-        <div class="info-row">
-          <div class="info-icon">
-            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          </div>
-          <div class="info-content">
-            <span class="info-label">Venue</span>
-            <span class="info-value">CAFOOZE</span>
-            <span class="info-value sub">Plot No. 7, Engineers Enclave,<br/>Y Junction, VT Agraharam, Vizianagaram</span>
-          </div>
-        </div>
-
-        <div class="info-row">
-          <div class="info-icon">
-            <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-          </div>
-          <div class="info-content">
-            <span class="info-label">Contact</span>
-            <span class="info-value sub">86888141067 &nbsp;|&nbsp; 9381755977</span>
-          </div>
-        </div>
+  <!-- ═══ ATTENDEE ═══ -->
+  <div class="attendee">
+    <div class="section-label">Attendee</div>
+    <div class="attendee-grid">
+      <div class="att-field">
+        <div class="att-label">Name</div>
+        <div class="att-value">{{ATTENDEE_NAME}}</div>
       </div>
-
-      <!-- Right: Attendee Details -->
-      <div class="right-panel">
-        <div class="section-title">Attendee Details</div>
-        <div class="divider" style="margin: 2px 0;"></div>
-
-        <div class="attendee-field">
-          <span class="field-label">Name</span>
-          <span class="field-value name">{{ATTENDEE_NAME}}</span>
-        </div>
-        <div class="attendee-field">
-          <span class="field-label">Gender</span>
-          <span class="field-value">{{ATTENDEE_GENDER}}</span>
-        </div>
-        <div class="attendee-field">
-          <span class="field-label">Email</span>
-          <span class="field-value">{{ATTENDEE_EMAIL}}</span>
-        </div>
-        <div class="attendee-field">
-          <span class="field-label">Mobile</span>
-          <span class="field-value">{{ATTENDEE_MOBILE}}</span>
-        </div>
-        <div class="attendee-field">
-          <span class="field-label">Ticket ID</span>
-          <span class="field-value ticket-id">{{TICKET_ID}}</span>
-        </div>
+      <div class="att-field">
+        <div class="att-label">Gender</div>
+        <div class="att-value">{{ATTENDEE_GENDER}}</div>
       </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- ═══ QR + BARCODE ═══ -->
-    <div class="bottom-section">
-      <div class="qr-area">
-        <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR Code" />
-        <span class="qr-label">Scan at Entry</span>
-        <div class="qr-security">This ticket will be validated electronically at the venue.<br/>QR is valid for one-time entry only.</div>
+      <div class="att-field">
+        <div class="att-label">Phone</div>
+        <div class="att-value">{{ATTENDEE_MOBILE}}</div>
       </div>
-
-      <div class="barcode-area">
-        <div class="barcode-box">
-          <svg id="barcode"></svg>
-          <div class="barcode-id">{{TICKET_ID}}</div>
-        </div>
-        <span class="barcode-label">Ticket Identification Barcode</span>
-
-        <!-- Generated time -->
-        <div style="margin-top:auto;">
-          <div style="font-family:'Courier New',monospace;font-size:6px;color:rgba(255,255,255,0.08);text-align:center;">
-            Generated: {{GENERATED_TIME}}
-          </div>
-        </div>
+      <div class="att-field">
+        <div class="att-label">Email</div>
+        <div class="att-value" style="font-size:13px;">{{ATTENDEE_EMAIL}}</div>
       </div>
-    </div>
-
-    <!-- ═══ PARTNER LOGOS (loaded from public/assets/) ═══ -->
-    <div class="partner-row">
-      {{PARTNER_LOGOS_HTML}}
-    </div>
-
-    <!-- ═══ FOOTER ═══ -->
-    <div class="footer">
-      <div class="footer-terms">
-        <span>Non Transferable</span>
-        <span class="dot">•</span>
-        <span>One Time Entry</span>
-        <span class="dot">•</span>
-        <span>Valid Only for This Event</span>
-        <span class="dot">•</span>
-        <span>No Refund</span>
-        <span class="dot">•</span>
-        <span>No Duplicate Entry</span>
-      </div>
-      <div class="footer-motto">Good Music • Good People • Great Memories</div>
-      <div class="footer-meta">ID: {{TICKET_ID}} • Powered by 7 NOTES</div>
     </div>
   </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══ CAFOOZE — MASSIVE ═══ -->
+  <div class="cafooze-block">
+    <div class="cafooze-gold-line"></div>
+    <div class="cafooze-logo-wrap">
+      <img class="cafooze-logo" src="{{LOGO_CAFOOZE}}" alt="CAFOOZE" />
+    </div>
+    <div class="cafooze-addr">
+      <strong>Plot No.7</strong> &nbsp;·&nbsp; <strong>Engineers Enclave</strong> &nbsp;·&nbsp; <strong>Y Junction</strong><br/>
+      Vizianagaram
+    </div>
+    <div class="cafooze-gold-line-bottom"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══ META ═══ -->
+  <div class="meta-row">
+    <div class="meta-item">
+      <div class="meta-label">Date</div>
+      <div class="meta-value gold">08 AUG 2026</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Time</div>
+      <div class="meta-value">5:30 PM – 9:00 PM</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Ticket ID</div>
+      <div class="meta-value" style="font-size:11px;font-family:'Space Grotesk',sans-serif;">{{TICKET_ID}}</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══ QR ═══ -->
+  <div class="qr-area">
+    <div class="qr-label">Scan at Entry</div>
+    <div class="qr-box">
+      <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR Code" />
+    </div>
+    <div class="qr-ticket-id">{{TICKET_ID}}</div>
+  </div>
+
+  <!-- ═══ BARCODE ═══ -->
+  <div class="barcode">
+    <div class="barcode-bars">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div>
+    </div>
+    <div class="barcode-id">{{TICKET_ID}}</div>
+  </div>
+
+  <!-- ═══ PARTNERS ═══ -->
+  <div class="partners">
+    <div class="partners-label">Powered by</div>
+    <div class="partners-logos">
+      <div class="partner-wrap" style="{{HIDE_YOURS}}">
+        <img class="partner-logo" src="{{LOGO_YOURSDIGITAL}}" alt="Yours Digital Marketing" />
+      </div>
+      <div class="partner-wrap" style="{{HIDE_FISANDY}}">
+        <img class="partner-logo" src="{{LOGO_FISANDY}}" alt="Stories by Fisandy" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <p class="footer-text">
+      7 NOTES Live Jamming Session &nbsp;|&nbsp; 08 August 2026 &nbsp;|&nbsp; 5:30 PM – 9:00 PM<br/>
+      CAFOOZE, Plot No 7, Engineers Enclave, Y Junction, Vizianagaram
+    </p>
+  </div>
+
 </div>
 
-<!-- ═══ INLINE JSBARCODE ═══ -->
-<script>{{JSBARCODE_SCRIPT}}</script>
-<script>
-  try {
-    JsBarcode("#barcode", "{{TICKET_ID}}", {
-      format: "CODE128",
-      width: 1.8,
-      height: 38,
-      displayValue: false,
-      background: "#ffffff",
-      lineColor: "#111111",
-      margin: 0,
-      fontSize: 0,
-    });
-  } catch(e) {
-    document.getElementById('barcode').outerHTML = '<span style="font-family:monospace;font-size:10px;background:#fff;color:#111;padding:6px 12px;border-radius:4px;">{{TICKET_ID}}</span>';
-  }
-</script>
 </body>
 </html>

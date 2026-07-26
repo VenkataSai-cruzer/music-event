@@ -10,7 +10,6 @@ const { createTables } = require('./db/init');
 const authRoutes = require('./routes/authRoutes');
 const scannerRoutes = require('./routes/scannerRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
-const settingsRoutes = require('./routes/settingsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,10 +50,6 @@ app.post('/api/tickets/verify', (req, res, next) => {
   const ticketController = require('./controllers/ticketController');
   ticketController.verifyTicket(req, res, next);
 });
-app.get('/api/tickets/preview/:ticketId', (req, res, next) => {
-  const ticketController = require('./controllers/ticketController');
-  ticketController.previewTicket(req, res, next);
-});
 app.post('/api/auth/scanner-login', (req, res, next) => {
   const { scannerLogin } = require('./controllers/scannerAuthController');
   scannerLogin(req, res, next);
@@ -66,13 +61,11 @@ app.use(morgan('dev'));
 // ── Static Files ──
 app.use('/qrcodes', express.static(path.join(__dirname, 'public', 'qrcodes')));
 app.use('/tickets', express.static(path.join(__dirname, 'public', 'tickets')));
-app.use('/logos', express.static(path.join(__dirname, 'public', 'logos')));
 
 // ── Routes (with auth) ──
 app.use('/api/auth', authRoutes); // POST /login, POST /scanner-login
 app.use('/api/scanners', scannerRoutes);  // Admin CRUD for scanners
 app.use('/api/tickets', ticketRoutes);
-app.use('/api/settings', settingsRoutes);
 
 // ── Health Check ──
 app.get('/health', (req, res) => {

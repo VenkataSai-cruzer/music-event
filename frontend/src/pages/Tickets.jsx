@@ -1,33 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Trash2, RefreshCw, ChevronLeft, ChevronRight, Filter, FileDown, Clock, Printer, Mail, Upload } from 'lucide-react';
+import { Search, Download, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ticketService } from '../services/ticketService';
 import Modal from '../components/Modal';
 import LoadingSpinner from '../components/LoadingSpinner';
-import TicketTimeline from '../components/TicketTimeline';
 
 export default function Tickets() {
   const [data, setData] = useState({ tickets: [], pagination: { total: 0, page: 1, totalPages: 1 } });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [timelineTarget, setTimelineTarget] = useState(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [importFile, setImportFile] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(null);
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
     try {
       const params = { page, limit: 15 };
       if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
       const res = await ticketService.getAll(params);
       setData(res.data);
     } catch (err) {
@@ -35,35 +25,21 @@ export default function Tickets() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search]);
 
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
 
-  // Debounce search
   const [searchInput, setSearchInput] = useState('');
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput), 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  /** Read a blob from axios error response and parse the error message */
-  const extractErrorMsg = async (err) => {
-    try {
-      if (err.response?.data?.text) {
-        const text = await err.response.data.text();
-        const json = JSON.parse(text);
-        return json.error || json.message || 'Failed to download PDF';
-      }
-    } catch (_) {}
-    return err.message || 'Failed to download PDF';
-  };
-
   const handleDownload = async (ticketId) => {
     try {
       const res = await ticketService.download(ticketId);
-      // Check if response is actually an error (blob with error JSON)
       if (res.data.type === 'application/json') {
         const text = await new Promise(resolve => {
           const reader = new FileReader();
@@ -83,9 +59,7 @@ export default function Tickets() {
       window.URL.revokeObjectURL(url);
       toast.success('PDF downloaded');
     } catch (err) {
-      const msg = await extractErrorMsg(err);
-      toast.error(msg);
-      console.error('Download error:', msg);
+      toast.error(err.message || 'Failed to download PDF');
     }
   };
 
@@ -101,84 +75,6 @@ export default function Tickets() {
       toast.error('Failed to delete ticket');
     } finally {
       setDeleting(false);
-    }
-  };
-
-  const handleExportCsv = async () => {
-    try {
-      const res = await ticketService.exportCsv();
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'tickets.csv');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success('CSV exported');
-    } catch (err) {
-      toast.error('Failed to export CSV');
-    }
-  };
-
-  const handleRegeneratePDF = async (ticketId) => {
-    try {
-      await ticketService.regeneratePDF(ticketId);
-      toast.success('PDF regenerated successfully');
-    } catch (err) {
-      toast.error('Failed to regenerate PDF');
-    }
-  };
-
-  const handleBadge = async (ticketId) => {
-    try {
-      const res = await ticketService.generateBadge(ticketId);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `badge-${ticketId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success('Badge downloaded');
-    } catch (err) {
-      toast.error('Failed to generate badge');
-    }
-  };
-
-  const handleSendEmail = async (ticket) => {
-    if (!ticket.email) {
-      toast.error('No email address for this ticket');
-      return;
-    }
-    setSendingEmail(ticket.ticket_id);
-    try {
-      await ticketService.sendEmail(ticket.ticket_id);
-      toast.success(`Email sent to ${ticket.email}`);
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to send email');
-    } finally {
-      setSendingEmail(null);
-    }
-  };
-
-  const handleImport = async () => {
-    if (!importFile) {
-      toast.error('Please select a CSV file');
-      return;
-    }
-    setImporting(true);
-    try {
-      const res = await ticketService.bulkImport(importFile);
-      toast.success(res.data.message);
-      setImportOpen(false);
-      setImportFile(null);
-      fetchTickets();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -199,51 +95,18 @@ export default function Tickets() {
           <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
           <p className="text-gray-500 mt-1">{data.pagination.total} total tickets</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-            title="Import tickets from CSV"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">Import CSV</span>
-          </button>
-          <button
-            onClick={handleExportCsv}
-            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-            title="Download all tickets as CSV"
-          >
-            <FileDown className="w-4 h-4" />
-            <span className="hidden sm:inline">Export CSV</span>
-          </button>
-        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
-            placeholder="Search by name, email, ticket ID, or mobile..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-sm"
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="pl-10 pr-8 py-2.5 border border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-sm bg-white appearance-none"
-          >
-            <option value="">All Status</option>
-            <option value="VALID">Valid</option>
-            <option value="USED">Used</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-        </div>
+      {/* Search */}
+      <div className="relative flex-1 max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
+          placeholder="Search by name, phone, or ticket ID..."
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-sm"
+        />
       </div>
 
       {/* Table */}
@@ -262,10 +125,9 @@ export default function Tickets() {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Ticket ID</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Email</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Mobile</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Event Date</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Phone</th>
                     <th className="text-center px-4 py-3 font-medium text-gray-600">Status</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Created</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
                   </tr>
                 </thead>
@@ -274,13 +136,12 @@ export default function Tickets() {
                     <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs text-gray-700">{ticket.ticket_id}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{ticket.name}</td>
-                      <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{ticket.email}</td>
-                      <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{ticket.mobile}</td>
-                      <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">
-                        {new Date(ticket.event_date).toLocaleDateString()}
-                      </td>
+                      <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{ticket.mobile}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={statusBadge(ticket.status)}>{ticket.status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">
+                        {new Date(ticket.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -290,34 +151,6 @@ export default function Tickets() {
                             title="Download PDF"
                           >
                             <Download className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleBadge(ticket.ticket_id)}
-                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors"
-                            title="Print Badge"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSendEmail(ticket)}
-                            className="p-2 rounded-lg hover:bg-sky-50 text-sky-600 transition-colors"
-                            title="Send Email"
-                          >
-                            <Mail className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setTimelineTarget(ticket.ticket_id)}
-                            className="p-2 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors"
-                            title="View Activity Timeline"
-                          >
-                            <Clock className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRegeneratePDF(ticket.ticket_id)}
-                            className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
-                            title="Regenerate PDF"
-                          >
-                            <RefreshCw className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteTarget(ticket.ticket_id)}
@@ -359,65 +192,6 @@ export default function Tickets() {
           </div>
         </>
       )}
-
-      {/* Bulk Import Modal */}
-      <Modal
-        open={importOpen}
-        onClose={() => { setImportOpen(false); setImportFile(null); }}
-        title="Import Tickets from CSV"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Upload a CSV file with columns: <code className="bg-gray-100 px-1 rounded">name</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">email</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">gender</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">mobile</code>
-          </p>
-          <label className="block">
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 cursor-pointer transition-colors">
-              {importFile ? (
-                <p className="text-sm text-indigo-600 font-medium">{importFile.name}</p>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Click to select CSV file</p>
-                  <p className="text-xs text-gray-400 mt-1">Max 500 rows, 5MB</p>
-                </>
-              )}
-              <input
-                type="file"
-                accept=".csv"
-                onChange={(e) => setImportFile(e.target.files[0])}
-                className="hidden"
-              />
-            </div>
-          </label>
-          <div className="flex gap-3">
-            <button
-              onClick={() => { setImportOpen(false); setImportFile(null); }}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleImport}
-              disabled={!importFile || importing}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
-            >
-              {importing ? 'Importing...' : 'Import'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Timeline Modal */}
-      <Modal
-        open={!!timelineTarget}
-        onClose={() => setTimelineTarget(null)}
-        title={`Activity Timeline — ${timelineTarget || ''}`}
-      >
-        <TicketTimeline ticketId={timelineTarget} />
-      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal

@@ -13,10 +13,10 @@ export default function Navbar({ onToggleSidebar, admin }) {
           </button>
           <div className="hidden lg:block">
             <h2 className="text-lg font-semibold text-gray-900">
-              Welcome back
+              7 NOTES
             </h2>
             <p className="text-sm text-gray-500">
-              Manage your event tickets
+              Live Jamming Session &middot; 08 Aug 2026
             </p>
           </div>
         </div>
