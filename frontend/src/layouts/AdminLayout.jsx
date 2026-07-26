@@ -13,8 +13,20 @@ export default function AdminLayout() {
     return <LoadingSpinner fullScreen />;
   }
 
+  // If not an admin, check if the user is a scanner (has scanner session)
   if (!isAuthenticated) {
+    const scannerToken = sessionStorage.getItem('scannerToken');
+    if (scannerToken) {
+      // Scanner user tried to access admin route — send to standalone scanner page
+      return <Navigate to="/scanner" replace />;
+    }
+    // No auth at all — send to admin login
     return <Navigate to="/login" replace />;
+  }
+
+  // Scanner users should use the standalone /scanner page — no sidebar
+  if (admin?.role === 'scanner') {
+    return <Navigate to="/scanner" replace />;
   }
 
   return (

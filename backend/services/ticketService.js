@@ -26,16 +26,24 @@ async function createTicket(ticketData) {
 
   const ticket = result.rows[0];
 
-  // Generate PDF with in-memory QR buffer
-  const pdfRelativePath = await generatePDF(ticket, qrBuffer);
+  try {
+    // Generate PDF with in-memory QR buffer
+    const pdfRelativePath = await generatePDF(ticket, qrBuffer);
 
-  // Store the PDF path
-  const updated = await pool.query(
-    `UPDATE tickets SET pdf_path = $1 WHERE id = $2 RETURNING *`,
-    [pdfRelativePath, ticket.id]
-  );
+    // Store the PDF path
+    const updated = await pool.query(
+      `UPDATE tickets SET pdf_path = $1 WHERE id = $2 RETURNING *`,
+      [pdfRelativePath, ticket.id]
+    );
 
-  return updated.rows[0];
+    return updated.rows[0];
+  } catch (pdfErr) {
+    // PDF generation failed — keep the ticket record (pdf_path remains NULL)
+    // The download endpoint will retry PDF generation via regeneratePDF()
+    console.error(`[createTicket] PDF generation failed for ticket_id=${ticket.ticket_id}:`, pdfErr.message);
+    // Return the ticket without a PDF — user can retry download later
+    return ticket;
+  }
 }
 
 /**

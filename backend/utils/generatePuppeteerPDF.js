@@ -141,13 +141,15 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     // Set viewport to match artwork dimensions exactly
     await page.setViewport({ width: 1536, height: 1024, deviceScaleFactor: 2 });
 
-    // Load content — all data is inline (no file:// or network reads needed)
+    // All content is inline base64 (no network requests) — 'load' is sufficient
+    // Use generous timeout because the first request also launches Chrome
+    page.setDefaultTimeout(60000);
     await page.setContent(html, {
-      waitUntil: ['load', 'networkidle0'],
-      timeout: 30000,
+      waitUntil: 'load',
+      timeout: 60000,
     });
 
-    // Brief settle time for rendering
+    // Brief settle time for fonts and rendering to complete
     await new Promise(r => setTimeout(r, 400));
 
     const fileName = `${ticket.qr_token}.pdf`;
