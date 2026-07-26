@@ -4,7 +4,7 @@ import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut 
 import toast from 'react-hot-toast';
 import axios from 'axios';
 const QR_SCANNER_ID = 'qr-scanner';
-const RESULT_DISPLAY_MS = 4000;
+const RESULT_DISPLAY_MS = 1500;
 const POLL_INTERVAL_MS = 10000;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -129,14 +129,20 @@ export default function Scan() {
   }, [playSound, getScannedBy, fetchCounter]);
 
   // ── Resume scanner after result display ──
+  // Stop + restart fresh instead of resume() — the same QR is still in camera
+  // frame and would be re-detected immediately, triggering a second 'already_used'
   const resumeScanner = useCallback(() => {
-    const scanner = scannerRef.current;
-    if (scanner) {
-      try { scanner.resume(); } catch (e) { /* not paused or stopped */ }
-    }
-    setResult(null);
-    // scanning stays true throughout — camera never appears to stop
-  }, []);
+    (async () => {
+      const scanner = scannerRef.current;
+      if (scanner) {
+        try { await scanner.stop(); } catch (e) {}
+      }
+      // Force creation of a fresh Html5Qrcode instance on next start
+      scannerRef.current = null;
+      setResult(null);
+      await startScanner();
+    })().catch(() => {});
+  }, [startScanner]);
 
   // Auto-resume after result timeout
   useEffect(() => {

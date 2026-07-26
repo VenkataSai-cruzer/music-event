@@ -4,11 +4,6 @@
 <meta charset="UTF-8" />
 <title>7 NOTES Concert Pass</title>
 <style>
-  @page {
-    size: 1536px 1024px;
-    margin: 0;
-  }
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -33,6 +28,7 @@
     position: absolute;
     z-index: 1;
     color: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -81,6 +77,7 @@
     font-size: 24px;
     font-weight: 600;
     letter-spacing: 0.5px;
+    text-shadow: 0 0 3px rgba(0,0,0,0.6);
   }
 
   /* Ticket ID — at (760, 790), w=260, h=55, below QR */
@@ -93,28 +90,34 @@
     font-weight: 600;
     letter-spacing: 2.5px;
     text-align: center;
+    text-shadow: 0 0 3px rgba(0,0,0,0.6);
   }
 
   /* ═══ QR CODE OVERLAY ═══ */
-  /* QR area: (720, 455), w=250, h=250. QR with 20px padding = 210×210 */
+  /* QR area: (720, 455), w=250, h=250. Must cover the original QR in the artwork completely.
+     White background masks the existing QR underneath. */
   .qr-overlay {
     position: absolute;
-    left: 740px;
-    top: 475px;
-    width: 210px;
-    height: 210px;
+    left: 720px;
+    top: 455px;
+    width: 250px;
+    height: 250px;
     z-index: 1;
+    object-fit: contain;
+    background: #ffffff;
   }
 
   /* ═══ BARCODE OVERLAY ═══ */
-  /* Barcode area: (730, 835), w=260, h=90. Barcode fills box with 4px padding */
+  /* Barcode area: (730, 835), w=260, h=90. Full-size overlay to cover existing barcode. */
   .barcode-overlay {
     position: absolute;
-    left: 734px;
-    top: 839px;
-    width: 252px;
-    height: 82px;
+    left: 730px;
+    top: 835px;
+    width: 260px;
+    height: 90px;
     z-index: 1;
+    object-fit: contain;
+    background: #ffffff;
   }
 </style>
 </head>

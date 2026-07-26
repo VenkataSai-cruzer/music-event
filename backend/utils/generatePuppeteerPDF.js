@@ -155,13 +155,19 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
 
-    // Generate PDF matching the artwork's exact dimensions — no scaling, no cropping
-    // Page size is driven by the @page CSS rule (1536px × 1024px)
+    // Generate PDF at the artwork's 3:2 aspect ratio
+    // Using explicit width/height (6×4 inch) instead of @page CSS because
+    // Puppeteer converts CSS px → pt (1px = 1pt), making @page much larger
+    // than the body content and producing white borders around the ticket.
+    //
+    // Viewport (1536×1024) matches the 3:2 ratio of 6×4 inches, so the
+    // artwork fills the entire PDF page with zero margins — no white borders.
     await page.pdf({
       path: filePath,
+      width: '6in',
+      height: '4in',
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
-      preferCSSPageSize: true,
       scale: 1,
     });
 
