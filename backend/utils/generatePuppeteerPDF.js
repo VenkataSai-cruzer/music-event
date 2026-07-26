@@ -1,7 +1,6 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
-const { pathToFileURL } = require('url');
 
 const BRAND_DIR = path.join(__dirname, '..', 'public', 'assets', 'brand');
 const TICKETS_DIR = path.join(__dirname, '..', 'public', 'tickets');
@@ -11,35 +10,83 @@ if (!fs.existsSync(TICKETS_DIR)) {
   fs.mkdirSync(TICKETS_DIR, { recursive: true });
 }
 
-/**
- * Returns a file:// URL for a brand asset, or empty string if missing.
- * Uses Node.js pathToFileURL() for correct cross-platform file:// format.
- * Chromium loads PNGs from disk in milliseconds via file:// URLs.
- */
-function logoFileUrl(filename) {
-  const filePath = path.join(BRAND_DIR, filename);
+// ══════════════════════════════════════════════════
+//  CACHED RESOURCES — loaded once at module load
+// ══════════════════════════════════════════════════
+
+let cachedBrowser = null;
+let cachedTemplate = null;
+const cachedLogos = {};
+
+function readImageBase64(filePath) {
   if (!fs.existsSync(filePath)) return '';
-  return pathToFileURL(path.resolve(filePath)).href;
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : ext === '.svg' ? 'image/svg+xml' :
+                 ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+    const data = fs.readFileSync(filePath).toString('base64');
+    return `data:${mime};base64,${data}`;
+  } catch (e) {
+    return '';
+  }
 }
 
+function cacheLogos() {
+  const LOGO_FILES = {
+    '7notes': '7notes-logo.png',
+    'cafooze': 'cafooze-logo.png',
+    'yoursdigital': 'yoursdigital.png',
+    'fisandy': 'fisandy.png',
+    'poster': 'poster.png',
+  };
+  for (const [key, filename] of Object.entries(LOGO_FILES)) {
+    cachedLogos[key] = readImageBase64(path.join(BRAND_DIR, filename));
+  }
+}
+
+// Load everything into cache at module load
+cachedTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
+cacheLogos();
+
+// ══════════════════════════════════════════════════
+//  BROWSER MANAGEMENT — launch once, reuse forever
+// ══════════════════════════════════════════════════
+
+async function getBrowser() {
+  if (cachedBrowser && cachedBrowser.isConnected()) {
+    return cachedBrowser;
+  }
+  cachedBrowser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+  });
+  return cachedBrowser;
+}
+
+async function closeBrowser() {
+  if (cachedBrowser) {
+    try { await cachedBrowser.close(); } catch (_) {}
+    cachedBrowser = null;
+  }
+}
+
+// Cleanup on SIGTERM/SIGINT (e.g., Railway restart)
+process.on('SIGTERM', () => closeBrowser());
+process.on('SIGINT', () => closeBrowser());
+
+// ══════════════════════════════════════════════════
+//  PDF GENERATION
+// ══════════════════════════════════════════════════
+
 /**
- * Generates a professional A4 ticket PDF using Puppeteer.
- * Brand images loaded via file:// URLs (NOT base64) for speed.
+ * Generates an A5 concert pass PDF using a persistent Chrome instance.
+ * Template, logos, and Chrome are all cached — only dynamic data changes.
+ * Expected time: 2-6 seconds for first ticket, faster for subsequent.
  */
 async function generatePuppeteerPDF(ticket, qrBuffer) {
   const qrBase64 = qrBuffer.toString('base64');
 
-  // Use file:// URLs instead of base64 — dramatically faster for large PNGs
-  const logo7notes = logoFileUrl('7notes-logo.png');
-  const logoCafooze = logoFileUrl('cafooze-logo.png');
-  const logoYours = logoFileUrl('yoursdigital.png');
-  const logoFisandy = logoFileUrl('fisandy.png');
-  const posterBg = logoFileUrl('poster.png');
-
-  let html = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
-
-  // Graceful fallback: if a logo is missing, inject CSS to hide its container
-  const hideMissingLogo = (url) => url ? '' : 'display:none;';
+  const hide = (val) => (val && val.length > 0) ? '' : 'display:none;';
 
   const replacements = {
     'ATTENDEE_NAME': ticket.name || '',
@@ -48,48 +95,39 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     'ATTENDEE_MOBILE': ticket.mobile || '',
     'TICKET_ID': ticket.ticket_id || '',
     'QR_BASE64': qrBase64,
-    'LOGO_7NOTES': logo7notes,
-    'LOGO_CAFOOZE': logoCafooze,
-    'LOGO_YOURSDIGITAL': logoYours,
-    'LOGO_FISANDY': logoFisandy,
-    'POSTER_BG': posterBg || '',
-    'HIDE_POSTER': hideMissingLogo(posterBg),
-    'HIDE_7NOTES': hideMissingLogo(logo7notes),
-    'HIDE_CAFOOZE': hideMissingLogo(logoCafooze),
-    'HIDE_YOURS': hideMissingLogo(logoYours),
-    'HIDE_FISANDY': hideMissingLogo(logoFisandy),
+    'LOGO_7NOTES': cachedLogos['7notes'] || '',
+    'LOGO_CAFOOZE': cachedLogos['cafooze'] || '',
+    'LOGO_YOURSDIGITAL': cachedLogos['yoursdigital'] || '',
+    'LOGO_FISANDY': cachedLogos['fisandy'] || '',
+    'POSTER_BG': cachedLogos['poster'] || '',
+    'HIDE_7NOTES': hide(cachedLogos['7notes']),
+    'HIDE_CAFOOZE': hide(cachedLogos['cafooze']),
+    'HIDE_YOURS': hide(cachedLogos['yoursdigital']),
+    'HIDE_FISANDY': hide(cachedLogos['fisandy']),
+    'HIDE_POSTER': hide(cachedLogos['poster']),
   };
 
+  // Replace placeholders in cached template (fast, no disk I/O)
+  let html = cachedTemplate;
   for (const [key, value] of Object.entries(replacements)) {
     html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value != null ? String(value) : '');
   }
 
-  // Write HTML to a temp file so we can use page.goto() instead of
-  // page.setContent(). goto() with file:// lets Chrome load images
-  // from disk natively — orders of magnitude faster than base64.
-  const tempDir = path.join(__dirname, '..', 'temp');
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-  const tempHtmlPath = path.join(tempDir, `ticket-${ticket.qr_token}.html`);
-  fs.writeFileSync(tempHtmlPath, html, 'utf-8');
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-  });
+  // Use cached Chrome browser (launched once at first use)
+  const browser = await getBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
     await page.setViewport({ width: 595, height: 842, deviceScaleFactor: 2 });
 
-    // page.goto with file:// loads images from disk natively — much faster
-    // Uses pathToFileURL() for correct Windows/Linux format
-    await page.goto(pathToFileURL(tempHtmlPath).href, {
+    // setContent with all data inline (base64 logos + QR — no file:// or disk reads)
+    await page.setContent(html, {
       waitUntil: ['load', 'networkidle2'],
       timeout: 30000,
     });
 
-    // Short settle time (1s is enough when images load from disk)
-    await new Promise(r => setTimeout(r, 1000));
+    // Short settle for font loading and rendering
+    await new Promise(r => setTimeout(r, 500));
 
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
@@ -102,12 +140,10 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
       preferCSSPageSize: true,
     });
 
-    // Clean up temp HTML file
-    try { fs.unlinkSync(tempHtmlPath); } catch (_) {}
-
     return `/tickets/${fileName}`;
   } finally {
-    await browser.close();
+    // Close only the page — keep browser alive for next generation
+    await page.close().catch(() => {});
   }
 }
 
