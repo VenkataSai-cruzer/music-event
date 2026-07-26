@@ -24,6 +24,7 @@ function App() {
       />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/scanner" element={<Scan />} />
         <Route path="/" element={<AdminLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
