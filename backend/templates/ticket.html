@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>7 NOTES Ticket</title>
+<title>7 NOTES Concert Pass</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
-  @page { size: A4; margin: 0; }
+  @page { size: A5; margin: 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -15,396 +14,383 @@
     font-family: 'Inter', sans-serif;
     background: #07070d;
     display: flex;
-    justify-content: center;
     align-items: center;
-    min-height: 297mm;
-    padding: 0;
+    justify-content: center;
+    min-height: 210mm;
   }
 
   .ticket {
-    width: 210mm;
-    height: 297mm;
-    overflow: hidden;
-    background: #0b0b18;
+    width: 148mm;
+    height: 210mm;
     position: relative;
+    overflow: hidden;
+    background: #0a0a0f;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
-  /* Dark gradient overlay for depth */
-  .ticket::after {
+  /* ═══ POSTER BACKGROUND ═══ */
+  .poster-layer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('{{POSTER_BG}}');
+    background-size: cover;
+    background-position: center;
+    z-index: 0;
+    {{HIDE_POSTER}}
+  }
+
+  /* Dark gradient overlay — deeper at edges, lighter in center */
+  .poster-layer::after {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at 50% 40%, rgba(245, 158, 11, 0.03) 0%, transparent 60%),
-                radial-gradient(ellipse at 50% 85%, rgba(245, 158, 11, 0.02) 0%, transparent 50%);
+    background: linear-gradient(180deg,
+      rgba(7, 7, 13, 0.88) 0%,
+      rgba(7, 7, 13, 0.45) 18%,
+      rgba(7, 7, 13, 0.15) 35%,
+      rgba(7, 7, 13, 0.25) 55%,
+      rgba(7, 7, 13, 0.60) 75%,
+      rgba(7, 7, 13, 0.92) 100%
+    );
     pointer-events: none;
-    z-index: 0;
+    z-index: 1;
   }
 
-  /* Gold top border */
-  .ticket::before {
-    content: '';
+  /* Gold top accent bar */
+  .gold-bar {
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 5px;
-    background: linear-gradient(90deg, #8B6914, #fbbf24, #d97706, #f59e0b, #8B6914, #fbbf24, #8B6914);
-    z-index: 2;
+    height: 3px;
+    background: linear-gradient(90deg, #8B6914, #fbbf24, #d97706, #fbbf24, #8B6914);
+    z-index: 3;
+  }
+
+  /* Gold bottom accent bar */
+  .gold-bar-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #8B6914, #fbbf24, #d97706, #fbbf24, #8B6914);
+    z-index: 3;
   }
 
   .content {
     position: relative;
-    z-index: 1;
-    padding: 0 36px;
+    z-index: 2;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    padding: 20px 22px 14px;
   }
 
-  /* ═══ DIVIDERS ═══ */
+  /* ═══ GOLD DIVIDERS ═══ */
   .divider-gold {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.2) 20%, rgba(245, 158, 11, 0.3) 50%, rgba(245, 158, 11, 0.2) 80%, transparent);
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.25) 20%, rgba(245, 158, 11, 0.40) 50%, rgba(245, 158, 11, 0.25) 80%, transparent);
+    flex-shrink: 0;
     margin: 0;
   }
 
-  .divider-subtle {
+  .divider-soft {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04) 50%, transparent);
-    margin: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06) 50%, transparent);
+    flex-shrink: 0;
   }
 
-  /* ═══ HERO ═══ */
+  /* ═══ HERO — 7 NOTES ═══ */
   .hero {
-    padding: 28px 0 14px;
     text-align: center;
     flex-shrink: 0;
+    padding: 4px 0 6px;
   }
 
   .hero-badge {
     display: inline-block;
-    padding: 4px 16px;
-    border: 1px solid rgba(245, 158, 11, 0.18);
+    padding: 3px 14px;
+    border: 1px solid rgba(245, 158, 11, 0.15);
     border-radius: 100px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 7px;
+    font-size: 6px;
     font-weight: 500;
-    letter-spacing: 4px;
+    letter-spacing: 3.5px;
     text-transform: uppercase;
     color: #fbbf24;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+  }
+
+  .hero-logo-wrap {
+    {{HIDE_7NOTES}}
+    display: flex;
+    justify-content: center;
+    margin-bottom: 4px;
   }
 
   .hero-logo {
-    max-width: 280px;
-    max-height: 72px;
-    display: block;
-    margin: 0 auto 8px;
+    max-width: 180px;
+    max-height: 46px;
     object-fit: contain;
   }
 
   .hero-tagline {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 9px;
+    font-size: 7px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.25);
-    letter-spacing: 5px;
+    color: rgba(255, 255, 255, 0.30);
+    letter-spacing: 4px;
     text-transform: uppercase;
   }
 
   .hero-tagline em {
     font-style: normal;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.50);
   }
 
-  /* ═══ CAFOOZE — CENTERPIECE ═══ */
-  .cafooze-section {
-    padding: 16px 0 14px;
+  /* ═══ CAFOOZE + EVENT INFO ═══ */
+  .event-section {
     text-align: center;
     flex-shrink: 0;
+    padding: 8px 0 6px;
   }
 
-  .cafooze-logo-wrap {
+  .event-venue {
     {{HIDE_CAFOOZE}}
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-bottom: 6px;
-  }
-
-  .cafooze-logo {
-    max-width: 340px;
-    max-height: 80px;
-    object-fit: contain;
-  }
-
-  .cafooze-addr {
-    font-size: 8px;
-    color: rgba(255, 255, 255, 0.2);
-    letter-spacing: 2px;
-    font-weight: 300;
-    line-height: 1.8;
-  }
-
-  .cafooze-addr strong {
-    color: rgba(255, 255, 255, 0.3);
-    font-weight: 400;
-  }
-
-  .cafooze-icon {
-    color: rgba(245, 158, 11, 0.2);
-    font-size: 14px;
-    letter-spacing: 6px;
     margin-bottom: 4px;
   }
 
-  /* ═══ TWO-COLUMN CONTENT ═══ */
+  .event-venue img {
+    max-width: 200px;
+    max-height: 48px;
+    object-fit: contain;
+  }
+
+  .event-addr {
+    font-size: 7px;
+    color: rgba(255, 255, 255, 0.22);
+    letter-spacing: 1.8px;
+    font-weight: 300;
+    line-height: 1.7;
+  }
+
+  .event-addr strong {
+    color: rgba(255, 255, 255, 0.32);
+    font-weight: 400;
+  }
+
+  .event-meta {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+
+  .event-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 7px;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 1px;
+  }
+
+  .event-meta-item .gold {
+    color: #fbbf24;
+    font-weight: 600;
+  }
+
+  .event-meta-item svg {
+    width: 10px;
+    height: 10px;
+    opacity: 0.4;
+  }
+
+  /* ═══ TWO-COLUMN: ATTENDEE + QR ═══ */
   .split-section {
     display: flex;
-    gap: 24px;
-    padding: 14px 0;
+    gap: 16px;
+    padding: 8px 0;
     flex: 1;
     min-height: 0;
   }
 
-  /* Left — Attendee Info */
-  .attendee-panel {
+  /* Left — Attendee */
+  .attendee-col {
     flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0;
   }
 
-  .section-head {
-    font-size: 7px;
+  .attendee-label {
+    font-size: 6px;
     font-weight: 600;
-    letter-spacing: 3px;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
-    color: rgba(245, 158, 11, 0.25);
-    margin-bottom: 10px;
+    color: rgba(245, 158, 11, 0.30);
+    margin-bottom: 6px;
   }
 
-  .att-row {
+  .attendee-row {
     display: flex;
     align-items: baseline;
-    padding: 5px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    padding: 3px 0;
   }
 
-  .att-row:last-child {
-    border-bottom: none;
-  }
-
-  .att-label {
-    font-size: 7px;
+  .attendee-row .tag {
+    font-size: 6px;
     font-weight: 500;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    color: rgba(245, 158, 11, 0.3);
-    width: 56px;
+    color: rgba(245, 158, 11, 0.25);
+    width: 44px;
     flex-shrink: 0;
   }
 
-  .att-value {
-    font-size: 15px;
+  .attendee-row .val {
+    font-size: 12px;
     font-weight: 600;
     color: #fff;
     letter-spacing: 0.3px;
   }
 
-  .att-value-email {
-    font-size: 12px;
+  .attendee-row .val-sm {
+    font-size: 10px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.80);
   }
 
-  /* Right — QR + Barcode */
-  .qr-panel {
-    width: 200px;
+  /* Right — QR */
+  .qr-col {
+    width: 148px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(245, 158, 11, 0.06);
-    border-radius: 12px;
-    padding: 14px 10px;
+  }
+
+  .qr-box {
+    background: #fff;
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .qr-box img {
+    display: block;
+    width: 128px;
+    height: 128px;
   }
 
   .qr-label {
     font-size: 6px;
     font-weight: 500;
-    letter-spacing: 2.5px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.15);
-    margin-bottom: 8px;
-  }
-
-  .qr-box {
-    display: inline-block;
-    padding: 8px;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  }
-
-  .qr-box img {
-    display: block;
-    width: 160px;
-    height: 160px;
+    margin-top: 5px;
   }
 
   .qr-ticket-id {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Playfair Display', serif;
     font-size: 8px;
-    letter-spacing: 1.5px;
-    color: rgba(255, 255, 255, 0.12);
-    margin-top: 6px;
+    letter-spacing: 1px;
+    color: rgba(245, 158, 11, 0.25);
+    margin-top: 2px;
   }
 
-  /* ═══ BARCODE ═══ */
+  /* Barcode */
   .barcode {
-    margin-top: 8px;
-    text-align: center;
-  }
-
-  .barcode-bars {
+    margin-top: 4px;
     display: flex;
-    justify-content: center;
-    gap: 1.5px;
-    height: 24px;
+    gap: 1px;
+    height: 16px;
     align-items: flex-end;
   }
 
-  .barcode-bars .bar {
+  .barcode .b {
     width: 1.5px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.10);
     border-radius: 0.5px;
   }
 
-  .barcode-bars .bar:nth-child(odd) { height: 14px; }
-  .barcode-bars .bar:nth-child(even) { height: 24px; }
-  .barcode-bars .bar:nth-child(3n) { height: 18px; }
-  .barcode-bars .bar:nth-child(5n) { height: 10px; }
-  .barcode-bars .bar:nth-child(7n) { height: 20px; }
-  .barcode-bars .bar:nth-child(11n) { height: 22px; }
-  .barcode-bars .bar:nth-child(13n) { height: 12px; }
+  .barcode .b:nth-child(odd) { height: 10px; }
+  .barcode .b:nth-child(even) { height: 16px; }
+  .barcode .b:nth-child(3n) { height: 12px; }
+  .barcode .b:nth-child(5n) { height: 8px; }
+  .barcode .b:nth-child(7n) { height: 14px; }
 
-  /* ═══ META BAR ═══ */
-  .meta-bar {
-    display: flex;
-    justify-content: center;
-    gap: 0;
-    padding: 12px 0;
-    flex-shrink: 0;
-  }
-
-  .meta-item {
-    text-align: center;
-    flex: 1;
-    position: relative;
-  }
-
-  .meta-item + .meta-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 12%;
-    height: 76%;
-    width: 1px;
-    background: linear-gradient(180deg, transparent, rgba(245, 158, 11, 0.08), transparent);
-  }
-
-  .meta-label {
-    font-size: 6px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.15);
-    margin-bottom: 3px;
-  }
-
-  .meta-value {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    color: #fff;
-  }
-
-  .meta-value.gold {
-    color: #fbbf24;
-  }
-
-  /* ═══ PARTNERS ═══ */
-  .partners {
-    padding: 12px 0 10px;
-    text-align: center;
-    flex-shrink: 0;
-  }
-
-  .partners-logos {
+  /* ═══ SPONSORS ═══ */
+  .sponsors {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 28px;
-    flex-wrap: nowrap;
+    gap: 24px;
+    padding: 8px 0 4px;
+    flex-shrink: 0;
   }
 
-  .partner-item {
+  .sponsor-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
   }
 
-  .partner-role {
-    font-size: 6px;
+  .sponsor-role {
+    font-size: 5.5px;
     font-weight: 500;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.08);
   }
 
-  .partner-logo {
-    max-height: 26px;
-    max-width: 100px;
+  .sponsor-logo {
+    max-height: 18px;
+    max-width: 80px;
     object-fit: contain;
-    opacity: 0.45;
+    opacity: 0.40;
     filter: brightness(0) invert(0.7);
   }
 
   /* ═══ FOOTER ═══ */
   .footer {
-    padding: 10px 0 20px;
     text-align: center;
+    padding: 4px 0 0;
     flex-shrink: 0;
-    margin-top: auto;
   }
 
   .footer-text {
-    font-size: 6px;
+    font-size: 5px;
     color: rgba(255, 255, 255, 0.06);
     line-height: 1.6;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
   }
 
   @media print {
-    body { background: #0b0b18; }
-    .ticket { box-shadow: none; }
-    .hero-logo, .partner-logo { filter: none !important; opacity: 0.65 !important; }
+    body { background: #0a0a0f; }
+    .hero-logo, .sponsor-logo { filter: none !important; opacity: 0.6 !important; }
   }
 </style>
 </head>
 <body>
 
 <div class="ticket">
+  <!-- Gold accent bars -->
+  <div class="gold-bar"></div>
+  <div class="gold-bar-bottom"></div>
+
+  <!-- Poster background -->
+  <div class="poster-layer"></div>
 
   <div class="content">
 
     <!-- ═══ HERO ═══ -->
     <div class="hero">
       <div class="hero-badge">Live Jamming Session</div>
-      <div class="hero-logo-wrap" style="{{HIDE_7NOTES}}">
+      <div class="hero-logo-wrap">
         <img class="hero-logo" src="{{LOGO_7NOTES}}" alt="7 NOTES" />
       </div>
       <p class="hero-tagline"><em>Feel It</em> &nbsp;&bull;&nbsp; <em>Live It</em> &nbsp;&bull;&nbsp; <em>Be It</em></p>
@@ -412,111 +398,95 @@
 
     <div class="divider-gold"></div>
 
-    <!-- ═══ CAFOOZE ═══ -->
-    <div class="cafooze-section">
-      <div class="cafooze-icon">♫ ♪ ♫</div>
-      <div class="cafooze-logo-wrap">
-        <img class="cafooze-logo" src="{{LOGO_CAFOOZE}}" alt="CAFOOZE" />
+    <!-- ═══ EVENT ═══ -->
+    <div class="event-section">
+      <div class="event-venue" style="{{HIDE_CAFOOZE}}">
+        <img src="{{LOGO_CAFOOZE}}" alt="CAFOOZE" />
       </div>
-      <div class="cafooze-addr">
+      <div class="event-addr">
         <strong>Plot No.7</strong> &nbsp;·&nbsp; <strong>Engineers Enclave</strong> &nbsp;·&nbsp; <strong>Y Junction</strong><br/>
         Vizianagaram
       </div>
+      <div class="event-meta">
+        <div class="event-meta-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span class="gold">08 AUG 2026</span>
+        </div>
+        <div class="event-meta-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>5:30 PM – 9:00 PM</span>
+        </div>
+      </div>
     </div>
 
-    <div class="divider-subtle"></div>
+    <div class="divider-soft"></div>
 
-    <!-- ═══ TWO-COLUMN: ATTENDEE + QR ═══ -->
+    <!-- ═══ ATTENDEE + QR ═══ -->
     <div class="split-section">
-      <!-- Left: Attendee Information -->
-      <div class="attendee-panel">
-        <div class="section-head">Attendee</div>
-        <div class="att-row">
-          <span class="att-label">Name</span>
-          <span class="att-value">{{ATTENDEE_NAME}}</span>
+      <div class="attendee-col">
+        <div class="attendee-label">Attendee</div>
+        <div class="attendee-row">
+          <span class="tag">Name</span>
+          <span class="val">{{ATTENDEE_NAME}}</span>
         </div>
-        <div class="att-row">
-          <span class="att-label">Gender</span>
-          <span class="att-value">{{ATTENDEE_GENDER}}</span>
+        <div class="attendee-row">
+          <span class="tag">Gender</span>
+          <span class="val">{{ATTENDEE_GENDER}}</span>
         </div>
-        <div class="att-row">
-          <span class="att-label">Phone</span>
-          <span class="att-value">{{ATTENDEE_MOBILE}}</span>
+        <div class="attendee-row">
+          <span class="tag">Phone</span>
+          <span class="val">{{ATTENDEE_MOBILE}}</span>
         </div>
-        <div class="att-row">
-          <span class="att-label">Email</span>
-          <span class="att-value att-value-email">{{ATTENDEE_EMAIL}}</span>
+        <div class="attendee-row">
+          <span class="tag">Email</span>
+          <span class="val val-sm">{{ATTENDEE_EMAIL}}</span>
         </div>
       </div>
 
-      <!-- Right: QR Code -->
-      <div class="qr-panel">
-        <div class="qr-label">Scan at Entry</div>
+      <div class="qr-col">
         <div class="qr-box">
-          <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR Code" />
+          <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR" />
         </div>
+        <div class="qr-label">Scan at Entry</div>
         <div class="qr-ticket-id">{{TICKET_ID}}</div>
-
         <div class="barcode">
-          <div class="barcode-bars">
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-            <div class="bar"></div><div class="bar"></div>
-          </div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div><div class="b"></div>
+          <div class="b"></div><div class="b"></div>
         </div>
       </div>
     </div>
 
-    <div class="divider-subtle"></div>
+    <div class="divider-soft"></div>
 
-    <!-- ═══ META BAR ═══ -->
-    <div class="meta-bar">
-      <div class="meta-item">
-        <div class="meta-label">Date</div>
-        <div class="meta-value gold">08 AUG 2026</div>
+    <!-- ═══ SPONSORS ═══ -->
+    <div class="sponsors">
+      <div class="sponsor-item" style="{{HIDE_YOURS}}">
+        <span class="sponsor-role">Powered by</span>
+        <img class="sponsor-logo" src="{{LOGO_YOURSDIGITAL}}" alt="Yours Digital" />
       </div>
-      <div class="meta-item">
-        <div class="meta-label">Time</div>
-        <div class="meta-value">5:30 PM – 9:00 PM</div>
-      </div>
-      <div class="meta-item">
-        <div class="meta-label">Ticket No</div>
-        <div class="meta-value" style="font-size:9px;">{{TICKET_ID}}</div>
+      <div class="sponsor-item" style="{{HIDE_FISANDY}}">
+        <span class="sponsor-role">Community Partner</span>
+        <img class="sponsor-logo" src="{{LOGO_FISANDY}}" alt="Fisandy" />
       </div>
     </div>
 
     <div class="divider-gold"></div>
 
-    <!-- ═══ PARTNERS ═══ -->
-    <div class="partners">
-      <div class="partners-logos">
-        <div class="partner-item" style="{{HIDE_YOURS}}">
-          <span class="partner-role">Powered by</span>
-          <img class="partner-logo" src="{{LOGO_YOURSDIGITAL}}" alt="Yours Digital Marketing" />
-        </div>
-        <div class="partner-item" style="{{HIDE_FISANDY}}">
-          <span class="partner-role">Stories by</span>
-          <img class="partner-logo" src="{{LOGO_FISANDY}}" alt="Stories by Fisandy" />
-        </div>
-      </div>
-    </div>
-
-    <div class="divider-subtle"></div>
-
     <!-- ═══ FOOTER ═══ -->
     <div class="footer">
       <p class="footer-text">
-        7 NOTES Live Jamming Session &nbsp;|&nbsp; 08 August 2026 &nbsp;|&nbsp; 5:30 PM – 9:00 PM<br/>
-        CAFOOZE, Plot No 7, Engineers Enclave, Y Junction, Vizianagaram
+        Electronically validated &nbsp;·&nbsp; One-time entry only &nbsp;·&nbsp; Non-transferable<br/>
+        Duplicate or altered tickets will be rejected
       </p>
     </div>
 
   </div>
-
 </div>
 
 </body>

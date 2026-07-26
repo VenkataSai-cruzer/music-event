@@ -34,6 +34,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   const logoCafooze = logoFileUrl('cafooze-logo.png');
   const logoYours = logoFileUrl('yoursdigital.png');
   const logoFisandy = logoFileUrl('fisandy.png');
+  const posterBg = logoFileUrl('poster.png');
 
   let html = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
 
@@ -51,6 +52,8 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     'LOGO_CAFOOZE': logoCafooze,
     'LOGO_YOURSDIGITAL': logoYours,
     'LOGO_FISANDY': logoFisandy,
+    'POSTER_BG': posterBg || '',
+    'HIDE_POSTER': hideMissingLogo(posterBg),
     'HIDE_7NOTES': hideMissingLogo(logo7notes),
     'HIDE_CAFOOZE': hideMissingLogo(logoCafooze),
     'HIDE_YOURS': hideMissingLogo(logoYours),
@@ -76,7 +79,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
 
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 595, height: 842, deviceScaleFactor: 2 });
 
     // page.goto with file:// loads images from disk natively — much faster
     // Uses pathToFileURL() for correct Windows/Linux format
@@ -93,7 +96,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
 
     await page.pdf({
       path: filePath,
-      format: 'A4',
+      format: 'A5',
       printBackground: true,
       margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
       preferCSSPageSize: true,
