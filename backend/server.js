@@ -67,8 +67,7 @@ app.get('/api/scanner/stats', async (req, res, next) => {
 // ── Logging ──
 app.use(morgan('dev'));
 
-// ── Static Files ──
-app.use('/qrcodes', express.static(path.join(__dirname, 'public', 'qrcodes')));
+// ── Static Files (ticket PDFs only — QR codes are generated in-memory) ──
 app.use('/tickets', express.static(path.join(__dirname, 'public', 'tickets')));
 
 // ── Routes (with auth) ──
