@@ -145,8 +145,10 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   const page = await browser.newPage();
 
   try {
-    // Set viewport to match artwork dimensions exactly
-    await page.setViewport({ width: 1536, height: 1024, deviceScaleFactor: 2 });
+    // Set viewport to match artwork dimensions exactly.
+    // deviceScaleFactor omitted (default 1) to avoid sub-pixel rendering
+    // shifts in PDF output that occur when CSS pixels ≠ device pixels.
+    await page.setViewport({ width: 1536, height: 1024 });
 
     // All content is inline base64 (except Google Fonts CSS).
     // Use 'domcontentloaded' — fires as soon as HTML is parsed, doesn't wait
