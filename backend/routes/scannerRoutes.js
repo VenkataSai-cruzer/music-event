@@ -1,24 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const pool = require('../db/db');
-const { JWT_SECRET } = require('../middleware/auth');
-
-// ── Inline admin auth (same pattern as ticketRoutes) ──
-function requireAdmin(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-    req.admin = decoded;
-    next();
-  } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired token.' });
-  }
-}
+const { requireAdmin } = require('../middleware/auth');
 
 /**
  * GET /api/scanners

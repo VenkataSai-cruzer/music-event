@@ -23,4 +23,17 @@ function authenticateToken(req, res, next) {
   }
 }
 
-module.exports = { authenticateToken, JWT_SECRET };
+/**
+ * Middleware that verifies JWT AND requires admin role.
+ * Wraps authenticateToken with a role check.
+ */
+function requireAdmin(req, res, next) {
+  authenticateToken(req, res, () => {
+    if (req.admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required.' });
+    }
+    next();
+  });
+}
+
+module.exports = { authenticateToken, requireAdmin, JWT_SECRET };

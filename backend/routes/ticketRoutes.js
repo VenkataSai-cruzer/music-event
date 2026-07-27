@@ -1,37 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 
 const {
   createTicket, getAllTickets, getDashboard,
   downloadTicket, useTicket, deleteTicket, getScanLogs,
 } = require('../controllers/ticketController');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
-
-function requireAuth(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required.' });
-    }
-    req.admin = decoded;
-    next();
-  } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired token.' });
-  }
-}
+const { requireAdmin } = require('../middleware/auth');
 
 // ── PROTECTED ROUTES ──
-router.get('/dashboard', requireAuth, getDashboard);
-router.get('/scan-logs', requireAuth, getScanLogs);
-router.post('/', requireAuth, createTicket);
-router.get('/', requireAuth, getAllTickets);
-router.put('/use/:ticketId', requireAuth, useTicket);
-router.get('/download/:ticketId', requireAuth, downloadTicket);
-router.delete('/:ticketId', requireAuth, deleteTicket);
+router.get('/dashboard', requireAdmin, getDashboard);
+router.get('/scan-logs', requireAdmin, getScanLogs);
+router.post('/', requireAdmin, createTicket);
+router.get('/', requireAdmin, getAllTickets);
+router.put('/use/:ticketId', requireAdmin, useTicket);
+router.get('/download/:ticketId', requireAdmin, downloadTicket);
+router.delete('/:ticketId', requireAdmin, deleteTicket);
 
 module.exports = router;
