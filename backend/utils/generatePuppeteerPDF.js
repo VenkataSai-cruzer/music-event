@@ -85,7 +85,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     loadSvgCache();
   }
 
-  // Replace placeholders in the SVG (no HTML/CSS changes, no layout)
+  // ── Replace placeholders ──
   let svgContent = cachedSvg;
   const replacements = {
     'NAME': ticket.name || '',
@@ -101,8 +101,39 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     svgContent = svgContent.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), String(value));
   }
 
-  // Minimal HTML wrapper — NO CSS, NO layout, NO flexbox, NO grid
-  const html = `<html><body style="margin:0">${svgContent}</body></html>`;
+  // ── Build proper HTML wrapper ──
+  // DOCTYPE + meta charset + SVG sizing CSS = tells Chromium exactly how to render
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>${svgContent}</body>
+</html>`;
+
+  // ── Debug: write rendered files for manual inspection ──
+  const debugDir = path.join(__dirname, '..', 'debug-output');
+  if (!fs.existsSync(debugDir)) {
+    fs.mkdirSync(debugDir, { recursive: true });
+  }
+  const debugId = ticket.qr_token || Date.now();
+  fs.writeFileSync(path.join(debugDir, `${debugId}.svg`), svgContent);
+  fs.writeFileSync(path.join(debugDir, `${debugId}.html`), html);
 
   // Get or launch cached Chrome browser
   const browser = await getBrowser();
@@ -113,13 +144,14 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     await page.setViewport({ width: 1536, height: 1024 });
     page.setDefaultTimeout(60000);
 
+    // Use networkidle0 to ensure all embedded images (QR, barcode) are fully loaded
     await page.setContent(html, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle0',
       timeout: 60000,
     });
 
-    // Brief settle for rendering
-    await new Promise(r => setTimeout(r, 200));
+    // Brief settle for final rendering
+    await new Promise(r => setTimeout(r, 500));
 
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
