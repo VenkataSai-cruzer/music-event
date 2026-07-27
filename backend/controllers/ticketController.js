@@ -1,6 +1,4 @@
 const ticketService = require('../services/ticketService');
-const path = require('path');
-const fs = require('fs');
 
 /**
  * POST /api/tickets

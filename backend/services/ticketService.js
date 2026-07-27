@@ -66,7 +66,7 @@ async function getAllTickets({ search, page = 1, limit = 20 }) {
   const total = parseInt(countResult.rows[0].count, 10);
 
   const result = await pool.query(
-    `SELECT * FROM tickets ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    `SELECT id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at FROM tickets ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
     [...params, limit, offset]
   );
 
@@ -166,7 +166,7 @@ async function regeneratePDF(ticketId) {
   const pdfBuffer = await generatePDF(ticket, qrBuffer);
 
   const updated = await pool.query(
-    `UPDATE tickets SET pdf_data = $1 WHERE ticket_id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at`,
+    `UPDATE tickets SET pdf_data = $1 WHERE ticket_id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at, pdf_data`,
     [pdfBuffer, ticketId]
   );
   return updated.rows[0];
