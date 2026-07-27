@@ -20,12 +20,20 @@ let cachedSvg = null;
 
 /**
  * Loads or reloads the cached SVG template from disk.
+ * Strips anything after </svg> (C2PA metadata) to avoid HTML parser issues.
  */
 function loadSvgCache() {
   if (!fs.existsSync(SVG_PATH)) {
     throw new Error(`SVG template not found at: ${SVG_PATH}`);
   }
-  cachedSvg = fs.readFileSync(SVG_PATH, 'utf-8');
+  let content = fs.readFileSync(SVG_PATH, 'utf-8');
+  // Strip anything after </svg> (C2PA content authenticity metadata) to avoid
+  // confusing the HTML5 parser when the SVG is embedded inside <body>.
+  const svgEnd = content.lastIndexOf('</svg>');
+  if (svgEnd !== -1) {
+    content = content.substring(0, svgEnd + 6);
+  }
+  cachedSvg = content;
   console.log(`[PDF] SVG template cached (${(cachedSvg.length / 1024).toFixed(1)} KB)`);
 }
 
@@ -147,11 +155,11 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     // Use networkidle0 to ensure all embedded images (QR, barcode) are fully loaded
     await page.setContent(html, {
       waitUntil: 'networkidle0',
-      timeout: 60000,
+      timeout: 120000,
     });
 
-    // Brief settle for final rendering
-    await new Promise(r => setTimeout(r, 500));
+    // Brief settle for final rendering (large SVG may need extra time)
+    await new Promise(r => setTimeout(r, 1000));
 
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
