@@ -52,8 +52,14 @@ export default function CreateTicket() {
       setCreatedTicket(ticket);
       toast.success(`Ticket ${ticket.ticket_id} created!`);
 
-      // Auto-download PDF
-      await doDownload(ticket.ticket_id);
+      // Auto-download PDF only if generation succeeded (pdf_path exists)
+      if (ticket.pdf_path) {
+        await doDownload(ticket.ticket_id);
+      } else {
+        // PDF is still generating or failed — show success with download button
+        setDownloadStarted(true);
+        toast('PDF is being generated — click Download to retrieve it', { icon: '⏳' });
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to create ticket');
     } finally {

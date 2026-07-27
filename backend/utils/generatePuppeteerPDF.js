@@ -153,16 +153,18 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     // Set viewport to match artwork dimensions exactly
     await page.setViewport({ width: 1536, height: 1024, deviceScaleFactor: 2 });
 
-    // All content is inline base64 (no network requests) — 'load' is sufficient
-    // Use generous timeout because the first request also launches Chrome
+    // All content is inline base64 (except Google Fonts CSS).
+    // Use 'domcontentloaded' — fires as soon as HTML is parsed, doesn't wait
+    // for Google Fonts to finish downloading (saves 2-5 seconds on cold start).
+    // Fonts that don't load in time will use system fallbacks (Inter → system-ui).
     page.setDefaultTimeout(60000);
     await page.setContent(html, {
-      waitUntil: 'load',
+      waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
 
-    // Brief settle time for fonts and rendering to complete
-    await new Promise(r => setTimeout(r, 400));
+    // Brief settle for CSS rendering to paint
+    await new Promise(r => setTimeout(r, 200));
 
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
