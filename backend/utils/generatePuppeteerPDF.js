@@ -18,21 +18,17 @@ if (!fs.existsSync(TICKETS_DIR)) {
 
 let cachedBrowser = null;
 let cachedTemplate = null;
-let cachedLogos = {};
+let cachedBackground = null;
 
-// Logo files to cache
-const LOGO_FILES = {
-  '7notes': '7notes-logo.png',
-  'yoursdigital': 'yoursdigital.png',
-  'fisandy': 'fisandy.png',
-};
+// Artwork file — the static ticket design from brand assets
+const ARTWORK_FILE = 'finalticket.png';
 
 /**
  * Reads an image file and returns it as a base64 data URI.
  */
 function readImageBase64(filePath) {
   if (!fs.existsSync(filePath)) {
-    console.error(`[PDF] Artwork not found at: ${filePath}`);
+    console.error(`[PDF] File not found at: ${filePath}`);
     return '';
   }
   try {
@@ -50,9 +46,10 @@ function readImageBase64(filePath) {
  * Loads or reloads the cached template and artwork from disk.
  */
 function loadCache() {
-  // Cache partner logos for dynamic injection
-  for (const [key, filename] of Object.entries(LOGO_FILES)) {
-    cachedLogos[key] = readImageBase64(path.join(BRAND_DIR, filename));
+  // Cache the static ticket design artwork as base64
+  cachedBackground = readImageBase64(path.join(BRAND_DIR, ARTWORK_FILE));
+  if (!cachedBackground) {
+    console.error(`[PDF] WARNING: Background artwork not found at ${path.join(BRAND_DIR, ARTWORK_FILE)}`);
   }
 
   if (!fs.existsSync(TEMPLATE_PATH)) {
@@ -120,8 +117,8 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   // Generate Code128 barcode as SVG data URI from Ticket ID
   const barcodeDataUri = await generateBarcode(ticket.ticket_id);
 
-  // Ensure logos are cached
-  if (!cachedLogos['7notes']) {
+  // Ensure background artwork is cached
+  if (!cachedBackground) {
     loadCache();
   }
 
@@ -134,9 +131,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     'TICKET_ID': ticket.ticket_id || '',
     'QR_BASE64': qrBase64,
     'BARCODE_BASE64': barcodeDataUri,
-    'LOGO_7NOTES': cachedLogos['7notes'] || '',
-    'LOGO_YOURSDIGITAL': cachedLogos['yoursdigital'] || '',
-    'LOGO_FISANDY': cachedLogos['fisandy'] || '',
+    'BACKGROUND_BASE64': cachedBackground || '',
   };
 
   // Apply replacements to cached template (fast string replace, no disk I/O)
