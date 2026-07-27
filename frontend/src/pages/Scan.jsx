@@ -441,98 +441,92 @@ export default function Scan() {
       )}
 
       {/* ═══════════════════════════════════ */}
-      {/*  MAIN SCANNER VIEW                 */}
+      {/*  MAIN SCANNER VIEW - full viewport  */}
       {/* ═══════════════════════════════════ */}
       {showScanner && (
-        <div className="max-w-lg mx-auto space-y-4">
+        <div className="fixed inset-0 z-30 flex flex-col bg-gray-950 overflow-hidden">
+          {/* Scanner Status Bar */}
           <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
 
-          {/* Entry Counter */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-indigo-100">Inside Venue</span>
-              <span className="text-2xl font-bold">{counter.used}</span>
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-indigo-100">Remaining</span>
-              <span className="text-2xl font-bold">{counter.remaining}</span>
-            </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
-              <div className="bg-white h-2 rounded-full transition-all duration-500"
-                style={{ width: `${counter.total > 0 ? (counter.used / counter.total) * 100 : 0}%` }} />
-            </div>
+          {/* Camera Preview — fills remaining space */}
+          <div className="flex-1 relative">
+            {/* Camera-off overlay */}
+            {(!scanning || cameraStatus === 'loading') && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-950 z-10">
+                <div className="text-center p-8">
+                  {cameraStatus === 'loading' ? (
+                    <>
+                      <svg className="animate-spin w-12 h-12 text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <p className="text-gray-400 text-sm">Starting camera...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-500 text-sm">Camera is off</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Scan overlay corners */}
+            {cameraStatus === 'ready' && scanning && (
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-8 left-8 w-14 h-14 border-t-4 border-l-4 border-indigo-400 rounded-tl-xl" />
+                <div className="absolute top-8 right-8 w-14 h-14 border-t-4 border-r-4 border-indigo-400 rounded-tr-xl" />
+                <div className="absolute bottom-8 left-8 w-14 h-14 border-b-4 border-l-4 border-indigo-400 rounded-bl-xl" />
+                <div className="absolute bottom-8 right-8 w-14 h-14 border-b-4 border-r-4 border-indigo-400 rounded-br-xl" />
+                <div className="absolute left-12 right-12 h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-scan" />
+              </div>
+            )}
+
+            {/* Processing overlay */}
+            {processing && (
+              <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20">
+                <div className="text-center">
+                  <svg className="animate-spin w-12 h-12 text-white mx-auto mb-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <p className="text-white text-sm">Verifying...</p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Scanner */}
-          <div className="bg-gray-900 rounded-2xl overflow-hidden shadow-lg relative">
-            <div className="relative aspect-square">
-              {/* Camera-off overlay */}
-              {(!scanning || cameraStatus === 'loading') && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
-                  <div className="text-center p-8">
-                    {cameraStatus === 'loading' ? (
-                      <>
-                        <svg className="animate-spin w-12 h-12 text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <p className="text-gray-400 text-sm">Starting camera...</p>
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                        <p className="text-gray-500 text-sm">Camera is off</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Scan overlay corners */}
-              {cameraStatus === 'ready' && scanning && (
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute top-4 left-4 w-10 h-10 border-t-2 border-l-2 border-indigo-400 rounded-tl-lg" />
-                  <div className="absolute top-4 right-4 w-10 h-10 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
-                  <div className="absolute bottom-4 left-4 w-10 h-10 border-b-2 border-l-2 border-indigo-400 rounded-bl-lg" />
-                  <div className="absolute bottom-4 right-4 w-10 h-10 border-b-2 border-r-2 border-indigo-400 rounded-br-lg" />
-                  <div className="absolute left-6 right-6 h-0.5 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-scan" />
-                </div>
-              )}
-
-              {/* Processing overlay */}
-              {processing && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                  <div className="text-center">
-                    <svg className="animate-spin w-10 h-10 text-white mx-auto mb-3" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <p className="text-white text-sm">Verifying...</p>
-                  </div>
-                </div>
+          {/* Bottom Controls */}
+          <div className="bg-gray-950 px-4 py-3 flex items-center justify-between border-t border-gray-800">
+            <div className="flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 rounded-full ${
+                cameraStatus === 'ready' ? 'bg-green-400 animate-pulse' :
+                cameraStatus === 'loading' ? 'bg-yellow-400 animate-pulse' :
+                'bg-gray-500'
+              }`} />
+              <span className="text-xs text-gray-400">
+                {cameraStatus === 'ready' ? 'Camera Ready' :
+                 cameraStatus === 'loading' ? 'Starting...' :
+                 'Stopped'}
+              </span>
+              {cameraError && cameraError !== 'permission_denied' && cameraError !== 'no_camera' && (
+                <span className="text-xs text-amber-400 ml-2">{cameraError}</span>
               )}
             </div>
-
-            {/* Controls */}
-            <div className="p-4 bg-gray-900 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className={`w-2.5 h-2.5 rounded-full ${
-                  cameraStatus === 'ready' ? 'bg-green-400 animate-pulse' :
-                  cameraStatus === 'loading' ? 'bg-yellow-400 animate-pulse' :
-                  'bg-gray-500'
-                }`} />
-                <span className="text-xs text-gray-400">
-                  {cameraStatus === 'ready' ? 'Camera Ready' :
-                   cameraStatus === 'loading' ? 'Starting...' :
-                   'Stopped'}
-                </span>
-                {cameraError && cameraError !== 'permission_denied' && cameraError !== 'no_camera' && (
-                  <span className="text-xs text-amber-400 ml-2">{cameraError}</span>
-                )}
-              </div>
+            <div className="flex items-center gap-3">
+              {/* Entry Counter Badge */}
+              {counter.total > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/30 rounded-lg">
+                  <span className="text-xs text-indigo-300">Inside</span>
+                  <span className="text-sm font-bold text-white">{counter.used}</span>
+                  <span className="text-xs text-gray-500">/</span>
+                  <span className="text-sm font-bold text-white">{counter.total}</span>
+                </div>
+              )}
               <button
                 onClick={scanning ? stopScanner : doStartScanner}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
                   scanning ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'
                 }`}
               >
@@ -540,8 +534,6 @@ export default function Scan() {
               </button>
             </div>
           </div>
-
-          <p className="text-xs text-gray-500 text-center">Scan QR to approve entry — one scan per ticket</p>
         </div>
       )}
 

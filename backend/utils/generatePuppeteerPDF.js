@@ -3,9 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const generateBarcode = require('./generateBarcode');
 
-const BRAND_DIR = path.join(__dirname, '..', 'public', 'assets', 'brand');
 const TICKETS_DIR = path.join(__dirname, '..', 'public', 'tickets');
-const TEMPLATE_PATH = path.join(__dirname, '..', 'templates', 'ticket-template.html');
+const SVG_PATH = path.join(__dirname, '..', 'templates', 'finalticket.svg');
 
 // Ensure tickets directory exists
 if (!fs.existsSync(TICKETS_DIR)) {
@@ -17,49 +16,21 @@ if (!fs.existsSync(TICKETS_DIR)) {
 // ══════════════════════════════════════════════════
 
 let cachedBrowser = null;
-let cachedTemplate = null;
-let cachedBackground = null;
-
-// Artwork file — the static ticket design from brand assets
-const ARTWORK_FILE = 'finalticket.png';
+let cachedSvg = null;
 
 /**
- * Reads an image file and returns it as a base64 data URI.
+ * Loads or reloads the cached SVG template from disk.
  */
-function readImageBase64(filePath) {
-  if (!fs.existsSync(filePath)) {
-    console.error(`[PDF] File not found at: ${filePath}`);
-    return '';
+function loadSvgCache() {
+  if (!fs.existsSync(SVG_PATH)) {
+    throw new Error(`SVG template not found at: ${SVG_PATH}`);
   }
-  try {
-    const ext = path.extname(filePath).toLowerCase();
-    const mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
-    const data = fs.readFileSync(filePath).toString('base64');
-    return `data:${mime};base64,${data}`;
-  } catch (e) {
-    console.error(`[PDF] Failed to read artwork:`, e.message);
-    return '';
-  }
-}
-
-/**
- * Loads or reloads the cached template and artwork from disk.
- */
-function loadCache() {
-  // Cache the static ticket design artwork as base64
-  cachedBackground = readImageBase64(path.join(BRAND_DIR, ARTWORK_FILE));
-  if (!cachedBackground) {
-    console.error(`[PDF] WARNING: Background artwork not found at ${path.join(BRAND_DIR, ARTWORK_FILE)}`);
-  }
-
-  if (!fs.existsSync(TEMPLATE_PATH)) {
-    throw new Error(`Template not found at: ${TEMPLATE_PATH}`);
-  }
-  cachedTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
+  cachedSvg = fs.readFileSync(SVG_PATH, 'utf-8');
+  console.log(`[PDF] SVG template cached (${(cachedSvg.length / 1024).toFixed(1)} KB)`);
 }
 
 // Initial load — runs once at module load
-loadCache();
+loadSvgCache();
 
 // ══════════════════════════════════════════════════
 //  BROWSER MANAGEMENT — launch once, reuse forever
@@ -88,24 +59,15 @@ process.on('SIGTERM', () => closeBrowser());
 process.on('SIGINT', () => closeBrowser());
 
 // ══════════════════════════════════════════════════
-//  PDF GENERATION
+//  PDF GENERATION — SVG-based, no HTML layout
 // ══════════════════════════════════════════════════
 
 /**
- * Generates a premium landscape concert ticket PDF (3:2 ratio, 6×4 inch).
+ * Generates a PDF ticket from the SVG master artwork.
  *
- * The ticket is a pure HTML+CSS design with:
- * - Abstract concert background (CSS gradients)
- * - Left 65%: event branding (7 NOTES, venue, date, partner logos)
- * - Right 35%: attendee info panel (name, gender, email, mobile, QR, barcode)
- * - Gold accents, dark theme, glass-effect panel
- * - Partner logos loaded from brand assets and injected as base64
- * - Google Fonts (Oswald + Inter) with system font fallbacks
- *
- * Caching strategy:
- * - Chrome browser: launched once, reused for all generations
- * - HTML template: loaded from disk at module init, string-replaced per request
- * - Logos: loaded as base64 at module init, injected into template
+ * The SVG is the ONLY ticket design. No HTML/CSS recreation.
+ * Only placeholders are replaced inside the SVG.
+ * The SVG is wrapped in a minimal HTML shell for Puppeteer.
  *
  * @param {Object} ticket - Ticket object with name, gender, email, mobile, ticket_id, qr_token.
  * @param {Buffer} qrBuffer - PNG buffer for the QR code.
@@ -113,78 +75,70 @@ process.on('SIGINT', () => closeBrowser());
  */
 async function generatePuppeteerPDF(ticket, qrBuffer) {
   const qrBase64 = qrBuffer.toString('base64');
+  const qrDataUri = `data:image/png;base64,${qrBase64}`;
 
-  // Generate Code128 barcode as SVG data URI from Ticket ID
+  // Generate Code128 barcode as SVG data URI
   const barcodeDataUri = await generateBarcode(ticket.ticket_id);
 
-  // Ensure background artwork is cached
-  if (!cachedBackground) {
-    loadCache();
+  // Ensure SVG is cached
+  if (!cachedSvg) {
+    loadSvgCache();
   }
 
-  // Build replacements map with cached resources (no disk I/O per request)
+  // Replace placeholders in the SVG (no HTML/CSS changes, no layout)
+  let svgContent = cachedSvg;
   const replacements = {
-    'ATTENDEE_NAME': ticket.name || '',
-    'ATTENDEE_GENDER': ticket.gender || '',
-    'ATTENDEE_EMAIL': ticket.email || '',
-    'ATTENDEE_MOBILE': ticket.mobile || '',
+    'NAME': ticket.name || '',
+    'GENDER': ticket.gender || '',
+    'EMAIL': ticket.email || '',
+    'MOBILE': ticket.mobile || '',
     'TICKET_ID': ticket.ticket_id || '',
-    'QR_BASE64': qrBase64,
-    'BARCODE_BASE64': barcodeDataUri,
-    'BACKGROUND_BASE64': cachedBackground || '',
+    'QR_IMAGE': qrDataUri,
+    'BARCODE_IMAGE': barcodeDataUri,
   };
 
-  // Apply replacements to cached template (fast string replace, no disk I/O)
-  let html = cachedTemplate;
   for (const [key, value] of Object.entries(replacements)) {
-    html = html.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), value != null ? String(value) : '');
+    svgContent = svgContent.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), String(value));
   }
 
-  // Get or launch cached Chrome browser (launched once, reused forever)
+  // Minimal HTML wrapper — NO CSS, NO layout, NO flexbox, NO grid
+  const html = `<html><body style="margin:0">${svgContent}</body></html>`;
+
+  // Get or launch cached Chrome browser
   const browser = await getBrowser();
   const page = await browser.newPage();
 
   try {
-    // Set viewport to match artwork dimensions exactly.
-    // deviceScaleFactor omitted (default 1) to avoid sub-pixel rendering
-    // shifts in PDF output that occur when CSS pixels ≠ device pixels.
+    // Viewport matches the SVG dimensions exactly (1536×1024, 3:2 ratio)
     await page.setViewport({ width: 1536, height: 1024 });
-
-    // All content is inline base64 (except Google Fonts CSS).
-    // Use 'domcontentloaded' — fires as soon as HTML is parsed, doesn't wait
-    // for Google Fonts to finish downloading (saves 2-5 seconds on cold start).
-    // Fonts that don't load in time will use system fallbacks (Inter → system-ui).
     page.setDefaultTimeout(60000);
+
     await page.setContent(html, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
 
-    // Brief settle for CSS rendering to paint
+    // Brief settle for rendering
     await new Promise(r => setTimeout(r, 200));
 
     const fileName = `${ticket.qr_token}.pdf`;
     const filePath = path.join(TICKETS_DIR, fileName);
 
-    // Generate PDF at the artwork's 3:2 aspect ratio
-    // Using explicit width/height (6×4 inch) instead of @page CSS because
-    // Puppeteer converts CSS px → pt (1px = 1pt), making @page much larger
-    // than the body content and producing white borders around the ticket.
-    //
-    // Viewport (1536×1024) matches the 3:2 ratio of 6×4 inches, so the
-    // artwork fills the entire PDF page with zero margins — no white borders.
+    // Landscape, single page, zero margins, print background, scale=1
     await page.pdf({
       path: filePath,
+      format: undefined,  // no format — use explicit dimensions
       width: '6in',
       height: '4in',
+      landscape: true,
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
       scale: 1,
+      pageRanges: '1',  // force exactly ONE page
     });
 
     return `/tickets/${fileName}`;
   } finally {
-    // Close only the page — keep browser alive for subsequent generations
     await page.close().catch(() => {});
   }
 }

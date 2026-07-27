@@ -2,6 +2,7 @@ const bwipjs = require('bwip-js');
 
 /**
  * Generates a Code128 barcode SVG data URI from the given text.
+ * Used inline inside the SVG ticket template via {{BARCODE_IMAGE}}.
  * @param {string} text - The text to encode (e.g., ticket ID).
  * @returns {Promise<string>} - An SVG data URI string.
  */
