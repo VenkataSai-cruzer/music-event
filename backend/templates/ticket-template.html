@@ -5,7 +5,7 @@
 <title>7 NOTES — Live Jamming Session</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -19,165 +19,253 @@
     color: #ffffff;
   }
 
-  /* ═══ ABSTRACT CONCERT BACKGROUND ═══ */
+  /* ═══ PREMIUM DARK BACKGROUND WITH DEPTH ═══ */
   .bg {
     position: absolute;
     inset: 0;
     z-index: 0;
     background:
-      /* Deep dark base */
-      radial-gradient(ellipse 120% 80% at 30% 50%, #12121a 0%, #0a0a0f 70%),
-      /* Soft spotlight — top left */
-      radial-gradient(ellipse 60% 50% at 25% 30%, rgba(212, 168, 83, 0.06) 0%, transparent 60%),
-      /* Warm glow — center right */
-      radial-gradient(ellipse 40% 60% at 75% 40%, rgba(212, 168, 83, 0.04) 0%, transparent 50%),
-      /* Subtle music-inspired texture lines */
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 60px,
-        rgba(255, 255, 255, 0.008) 60px,
-        rgba(255, 255, 255, 0.008) 61px
-      );
+      /* Deep pitch-black base */
+      linear-gradient(135deg, #050508 0%, #0a0a12 40%, #0d0d18 70%, #08080e 100%),
+      /* Subtle noise-like grain texture via repeating gradients */
+      repeating-conic-gradient(
+        rgba(255,255,255,0.008) 0% 25%, transparent 0% 50%
+      ) 0 0 / 3px 3px;
   }
 
-  /* ═══ GOLD TOP ACCENT BAR ═══ */
+  /* ═══ DECORATIVE SPOTLIGHT EFFECTS ═══ */
+  .spotlight-1 {
+    position: absolute;
+    top: -20%;
+    left: -10%;
+    width: 70%;
+    height: 80%;
+    z-index: 0;
+    background: radial-gradient(ellipse 60% 50% at 40% 30%, rgba(212, 168, 83, 0.07) 0%, transparent 65%);
+    pointer-events: none;
+  }
+
+  .spotlight-2 {
+    position: absolute;
+    bottom: -20%;
+    right: -5%;
+    width: 60%;
+    height: 70%;
+    z-index: 0;
+    background: radial-gradient(ellipse 50% 40% at 60% 70%, rgba(212, 168, 83, 0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .spotlight-3 {
+    position: absolute;
+    top: 40%;
+    right: 30%;
+    width: 40%;
+    height: 30%;
+    z-index: 0;
+    background: radial-gradient(ellipse 40% 30% at 50% 50%, rgba(150, 80, 200, 0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* ═══ GOLD METALLIC TOP BAR — FOIL EFFECT ═══ */
   .gold-bar-top {
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 3px;
-    z-index: 2;
+    height: 4px;
+    z-index: 3;
     background: linear-gradient(90deg,
-      transparent 5%,
+      transparent 3%,
+      #8b6914 12%,
       #c9952e 20%,
-      #d4a853 35%,
-      #f0d080 50%,
+      #e5c065 30%,
+      #f5e0a0 40%,
+      #e5c065 50%,
+      #c9952e 55%,
       #d4a853 65%,
-      #c9952e 80%,
-      transparent 95%
+      #f0d080 75%,
+      #c9952e 85%,
+      #8b6914 92%,
+      transparent 97%
     );
+    box-shadow: 0 0 20px rgba(212, 168, 83, 0.15);
   }
 
   .gold-bar-bottom {
     position: absolute;
     bottom: 0; left: 0; right: 0;
-    height: 2px;
-    z-index: 2;
+    height: 3px;
+    z-index: 3;
     background: linear-gradient(90deg,
       transparent 5%,
-      rgba(212, 168, 83, 0.3) 20%,
-      rgba(212, 168, 83, 0.5) 50%,
-      rgba(212, 168, 83, 0.3) 80%,
+      rgba(212, 168, 83, 0.2) 20%,
+      rgba(212, 168, 83, 0.35) 50%,
+      rgba(212, 168, 83, 0.2) 80%,
       transparent 95%
     );
   }
 
-  /* ═══ GOLD DIVIDER — SEPARATES LEFT/RIGHT ═══ */
+  /* ═══ DECORATIVE DIVIDER — SCORPED LINE EFFECT ═══ */
   .divider {
     position: absolute;
-    left: 998px;
-    top: 60px;
-    bottom: 60px;
-    width: 1px;
+    left: 975px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
     z-index: 1;
     background: linear-gradient(
       180deg,
-      transparent,
-      rgba(212, 168, 83, 0.15) 15%,
-      rgba(212, 168, 83, 0.25) 50%,
-      rgba(212, 168, 83, 0.15) 85%,
-      transparent
+      transparent 3%,
+      rgba(212, 168, 83, 0.04) 10%,
+      rgba(212, 168, 83, 0.08) 30%,
+      rgba(212, 168, 83, 0.12) 50%,
+      rgba(212, 168, 83, 0.08) 70%,
+      rgba(212, 168, 83, 0.04) 90%,
+      transparent 97%
     );
   }
 
-  /* ═══ LEFT SECTION — EVENT BRANDING (65%) ═══ */
+  /* ═══ SECURITY PATTERN STRIP — LEFT EDGE ═══ */
+  .security-strip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    z-index: 2;
+    background: repeating-linear-gradient(
+      180deg,
+      rgba(212, 168, 83, 0.25) 0px,
+      rgba(212, 168, 83, 0.25) 2px,
+      transparent 2px,
+      transparent 6px,
+      rgba(212, 168, 83, 0.15) 6px,
+      rgba(212, 168, 83, 0.15) 8px,
+      transparent 8px,
+      transparent 12px
+    );
+  }
+
+  /* ═══ LEFT SECTION — EVENT BRANDING (63.5%) ═══ */
   .left {
     position: absolute;
     left: 0;
     top: 0;
-    width: 998px;
+    width: 975px;
     height: 1024px;
     z-index: 1;
-    padding: 70px 60px 50px;
+    padding: 55px 50px 40px 55px;
     display: flex;
     flex-direction: column;
   }
 
-  /* ═══ RIGHT SECTION — ATTENDEE PANEL (35%) ═══ */
+  /* ═══ RIGHT SECTION — ATTENDEE PANEL (36.5%) ═══ */
   .right {
     position: absolute;
-    left: 998px;
+    left: 975px;
     top: 0;
-    width: 538px;
+    width: 561px;
     height: 1024px;
     z-index: 1;
-    padding: 70px 45px 50px;
+    padding: 55px 40px 40px 40px;
+    display: flex;
+    flex-direction: column;
   }
 
+  /* ═══ PREMIUM GLASS-MORPHISM PANEL ═══ */
   .attendee-panel {
     width: 100%;
     height: 100%;
     background: linear-gradient(
-      160deg,
+      165deg,
       rgba(255, 255, 255, 0.04) 0%,
-      rgba(255, 255, 255, 0.015) 100%
+      rgba(255, 255, 255, 0.008) 100%
     );
-    border: 1px solid rgba(212, 168, 83, 0.1);
-    border-radius: 16px;
-    padding: 38px 32px;
+    border: 1px solid rgba(212, 168, 83, 0.08);
+    border-radius: 18px;
+    padding: 32px 30px;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(2px);
+  }
+
+  .attendee-panel::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 20%;
+    right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212, 168, 83, 0.2), transparent);
   }
 
   /* ═══ EVENT BRANDING ═══ */
 
-  .brand-top {
+  .brand-area {
     flex-shrink: 0;
   }
 
   .event-badge {
     display: inline-block;
-    padding: 5px 16px;
-    border: 1px solid rgba(212, 168, 83, 0.2);
+    padding: 4px 14px;
+    border: 1px solid rgba(212, 168, 83, 0.15);
     border-radius: 100px;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 3.5px;
     text-transform: uppercase;
-    color: rgba(212, 168, 83, 0.7);
-    margin-bottom: 20px;
+    color: rgba(212, 168, 83, 0.55);
+    margin-bottom: 16px;
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   .event-title {
-    font-family: 'Oswald', 'Impact', 'Arial Black', fantasy;
-    font-size: 82px;
-    font-weight: 700;
-    line-height: 0.85;
-    letter-spacing: 4px;
+    font-family: 'Bebas Neue', 'Impact', 'Arial Black', fantasy;
+    font-size: 96px;
+    font-weight: 400;
+    line-height: 0.82;
+    letter-spacing: 6px;
     text-transform: uppercase;
     color: #ffffff;
-    margin-bottom: 8px;
+    margin-bottom: 2px;
+    text-shadow: 0 2px 40px rgba(0,0,0,0.3);
   }
 
   .event-title .gold {
     color: #d4a853;
+    text-shadow: 0 0 30px rgba(212, 168, 83, 0.15);
   }
 
-  .event-subtitle {
-    font-size: 16px;
-    font-weight: 300;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.3);
+  .event-subtitle-line {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     margin-bottom: 4px;
   }
 
+  .event-subtitle {
+    font-size: 15px;
+    font-weight: 300;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.2);
+  }
+
+  .subtitle-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(212, 168, 83, 0.3);
+  }
+
   .event-tagline {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 400;
-    letter-spacing: 2px;
-    color: rgba(212, 168, 83, 0.4);
-    margin-bottom: 40px;
+    letter-spacing: 3.5px;
+    color: rgba(212, 168, 83, 0.3);
+    font-family: 'Space Grotesk', sans-serif;
+    text-transform: uppercase;
   }
 
   /* ═══ EVENT DETAILS ═══ */
@@ -187,89 +275,108 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    padding: 16px 0;
   }
 
-  .detail-row {
+  .details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 30px;
+  }
+
+  .detail-item {
     display: flex;
     align-items: flex-start;
-    margin-bottom: 22px;
+    gap: 12px;
   }
 
-  .detail-icon {
-    width: 24px;
+  .detail-icon-wrap {
+    width: 28px;
+    height: 28px;
     flex-shrink: 0;
-    margin-top: 1px;
+    background: rgba(212, 168, 83, 0.06);
+    border: 1px solid rgba(212, 168, 83, 0.08);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .detail-icon svg {
-    width: 16px;
-    height: 16px;
-    stroke: rgba(212, 168, 83, 0.5);
+  .detail-icon-wrap svg {
+    width: 14px;
+    height: 14px;
+    stroke: rgba(212, 168, 83, 0.4);
     fill: none;
   }
 
-  .detail-content {
-    margin-left: 12px;
+  .detail-text-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
   }
 
   .detail-label {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 600;
-    letter-spacing: 2px;
+    letter-spacing: 1.8px;
     text-transform: uppercase;
-    color: rgba(212, 168, 83, 0.35);
-    margin-bottom: 2px;
+    color: rgba(212, 168, 83, 0.25);
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   .detail-value {
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 700;
     color: #ffffff;
     letter-spacing: 0.5px;
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   .detail-value-sm {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.35);
     letter-spacing: 0.3px;
     line-height: 1.4;
+    margin-top: 1px;
   }
 
-  /* ═══ PARTNER LOGOS ═══ */
+  /* ═══ SPONSOR/PARTNER LOGOS ═══ */
 
   .partners {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 40px;
-    padding-top: 30px;
+    gap: 36px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
   }
 
   .partner-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
   }
 
   .partner-label {
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 500;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.08);
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   .partner-logo {
-    max-height: 26px;
-    max-width: 120px;
+    max-height: 22px;
+    max-width: 100px;
     object-fit: contain;
     opacity: 0.5;
   }
 
   .partner-logo-7notes {
-    max-height: 40px;
-    max-width: 200px;
+    max-height: 36px;
+    max-width: 180px;
     object-fit: contain;
   }
 
@@ -277,31 +384,46 @@
 
   .panel-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     flex-shrink: 0;
   }
 
   .panel-title {
-    font-family: 'Oswald', 'Impact', 'Arial Black', fantasy;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 3px;
+    font-family: 'Bebas Neue', 'Impact', 'Arial Black', fantasy;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 4px;
     text-transform: uppercase;
-    color: rgba(212, 168, 83, 0.6);
+    color: rgba(212, 168, 83, 0.4);
   }
 
   .panel-divider {
     height: 1px;
-    margin: 14px 0;
-    background: linear-gradient(90deg, transparent, rgba(212, 168, 83, 0.12), transparent);
+    margin: 10px 0;
+    background: linear-gradient(90deg, transparent, rgba(212, 168, 83, 0.08), transparent);
   }
 
-  /* ═══ ATTENDEE FIELDS ═══ */
+  /* ═══ ATTENDEE FIELDS — PREMIUM LAYOUT ═══ */
+
+  .fields-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+
+  .fields-row .field {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+  }
 
   .field {
     display: flex;
-    align-items: baseline;
-    margin-bottom: 12px;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
   }
 
   .field:last-of-type {
@@ -309,32 +431,32 @@
   }
 
   .field-label {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 600;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    color: rgba(212, 168, 83, 0.3);
-    width: 52px;
-    flex-shrink: 0;
+    color: rgba(212, 168, 83, 0.2);
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   .field-value {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #ffffff;
     letter-spacing: 0.3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   .field-value-sm {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.65);
+    color: rgba(255, 255, 255, 0.55);
   }
 
-  /* ═══ QR CODE ═══ */
+  /* ═══ QR CODE — PROMINENT ═══ */
 
   .qr-section {
     flex: 1;
@@ -342,41 +464,68 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin: 8px 0;
+    margin: 6px 0 4px;
   }
 
   .qr-box {
     background: #ffffff;
-    border-radius: 12px;
-    padding: 8px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    border-radius: 16px;
+    padding: 6px;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(212, 168, 83, 0.06);
+    position: relative;
+  }
+
+  .qr-box::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 18px;
+    border: 1px solid rgba(212, 168, 83, 0.06);
+    pointer-events: none;
   }
 
   .qr-box img {
     display: block;
-    width: 216px;
-    height: 216px;
+    width: 195px;
+    height: 195px;
   }
 
   .qr-label {
-    font-size: 8px;
+    font-size: 7px;
     font-weight: 500;
-    letter-spacing: 2px;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.15);
-    margin-top: 6px;
+    color: rgba(255, 255, 255, 0.1);
+    margin-top: 4px;
+    font-family: 'Space Grotesk', sans-serif;
   }
 
   /* ═══ TICKET ID ═══ */
 
+  .ticket-id-row {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 2px 0;
+  }
+
+  .ticket-id-dot {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: rgba(212, 168, 83, 0.15);
+  }
+
   .ticket-id {
-    font-family: 'Inter', monospace;
-    font-size: 12px;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 10px;
     font-weight: 600;
-    letter-spacing: 1.5px;
-    color: rgba(212, 168, 83, 0.35);
-    text-align: center;
-    margin-top: 2px;
+    letter-spacing: 2px;
+    color: rgba(212, 168, 83, 0.2);
   }
 
   /* ═══ BARCODE ═══ */
@@ -386,27 +535,70 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 8px;
+    padding-top: 4px;
   }
 
   .barcode-img {
-    width: 240px;
-    height: 40px;
+    width: 200px;
+    height: 34px;
     object-fit: contain;
+  }
+
+  /* ═══ HAPTIC EDGE DETAILS ═══ */
+
+  .edge-notch-tl {
+    position: absolute;
+    top: 20px;
+    left: 997px;
+    width: 16px;
+    height: 16px;
+    z-index: 2;
+    border-radius: 50%;
+    box-shadow:
+      -4px -4px 0 0 rgba(212, 168, 83, 0.03),
+      -8px -8px 0 1px rgba(0,0,0,0.05);
+  }
+
+  .edge-notch-bl {
+    position: absolute;
+    bottom: 20px;
+    left: 997px;
+    width: 16px;
+    height: 16px;
+    z-index: 2;
+    border-radius: 50%;
+    box-shadow:
+      -4px 4px 0 0 rgba(212, 168, 83, 0.03),
+      -8px 8px 0 1px rgba(0,0,0,0.05);
   }
 
   /* ═══ FOOTER ═══ */
 
-  .footer-text {
+  .footer {
     position: absolute;
-    bottom: 18px;
+    bottom: 14px;
     left: 0;
     right: 0;
-    text-align: center;
-    font-size: 8px;
-    letter-spacing: 1.5px;
-    color: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
     z-index: 1;
+  }
+
+  .footer-text {
+    font-size: 7px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.04);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .footer-dot {
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
   }
 
   /* ═══ HIDE HELPER ═══ */
@@ -415,60 +607,100 @@
 </head>
 <body>
 
-  <!-- ██ BACKGROUND ██ -->
+  <!-- ██ BACKGROUND LAYERS ██ -->
   <div class="bg"></div>
+  <div class="spotlight-1"></div>
+  <div class="spotlight-2"></div>
+  <div class="spotlight-3"></div>
 
-  <!-- ██ GOLD ACCENT BARS ██ -->
+  <!-- ██ GOLD METALLIC BARS ██ -->
   <div class="gold-bar-top"></div>
   <div class="gold-bar-bottom"></div>
+
+  <!-- ██ SECURITY STRIP ██ -->
+  <div class="security-strip"></div>
+
+  <!-- ██ DECORATIVE EDGE NOTCHES ██ -->
+  <div class="edge-notch-tl"></div>
+  <div class="edge-notch-bl"></div>
 
   <!-- ██ DIVIDER ██ -->
   <div class="divider"></div>
 
   <!-- ══════════════════════════════════════════════ -->
-  <!--  LEFT: EVENT BRANDING (65%)                  -->
+  <!--  LEFT: EVENT BRANDING (63.5%)                -->
   <!-- ══════════════════════════════════════════════ -->
   <div class="left">
 
-    <div class="brand-top">
+    <div class="brand-area">
       <div class="event-badge">Live Jamming Session</div>
       <div class="event-title">7 <span class="gold">NOTES</span></div>
-      <div class="event-subtitle">A Night of Live Music &amp; Energy</div>
-      <div class="event-tagline">Feel It · Live It · Be It</div>
+      <div class="event-subtitle-line">
+        <span class="event-subtitle">A Night of Live Music &amp; Energy</span>
+        <span class="subtitle-dot"></span>
+        <span class="event-tagline">Feel It · Live It · Be It</span>
+      </div>
     </div>
 
     <div class="event-details">
+      <div class="details-grid">
 
-      <div class="detail-row">
-        <div class="detail-icon">
-          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
+        <div class="detail-item">
+          <div class="detail-icon-wrap">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <div class="detail-text-wrap">
+            <span class="detail-label">Venue</span>
+            <span class="detail-value">CAFOOZE</span>
+            <span class="detail-value-sm">Plot No. 7, Engineers Enclave<br/>Y Junction, Vizianagaram</span>
+          </div>
         </div>
-        <div class="detail-content">
-          <div class="detail-label">Venue</div>
-          <div class="detail-value">CAFOOZE</div>
-          <div class="detail-value-sm">Plot No. 7, Engineers Enclave<br/>Y Junction, Vizianagaram</div>
+
+        <div class="detail-item">
+          <div class="detail-icon-wrap">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div class="detail-text-wrap">
+            <span class="detail-label">Date</span>
+            <span class="detail-value">08 AUG 2026</span>
+          </div>
         </div>
+
+        <div class="detail-item">
+          <div class="detail-icon-wrap">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="detail-text-wrap">
+            <span class="detail-label">Time</span>
+            <span class="detail-value">5:30 PM – 9:00 PM</span>
+          </div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-icon-wrap">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+              <line x1="7" y1="7" x2="7.01" y2="7"/>
+            </svg>
+          </div>
+          <div class="detail-text-wrap">
+            <span class="detail-label">Ticket Type</span>
+            <span class="detail-value">General Entry</span>
+          </div>
+        </div>
+
       </div>
-
-      <div class="detail-row">
-        <div class="detail-icon">
-          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        </div>
-        <div class="detail-content">
-          <div class="detail-label">Date &amp; Time</div>
-          <div class="detail-value">08 AUG 2026</div>
-          <div class="detail-value-sm">5:30 PM – 9:00 PM</div>
-        </div>
-      </div>
-
     </div>
 
     <div class="partners">
@@ -489,7 +721,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════ -->
-  <!--  RIGHT: ATTENDEE INFORMATION (35%)           -->
+  <!--  RIGHT: ATTENDEE INFORMATION (36.5%)          -->
   <!-- ══════════════════════════════════════════════ -->
   <div class="right">
 
@@ -501,21 +733,25 @@
       </div>
 
       <!-- Attendee Fields -->
-      <div class="field">
-        <span class="field-label">Name</span>
-        <span class="field-value">{{ATTENDEE_NAME}}</span>
+      <div class="fields-row">
+        <div class="field">
+          <span class="field-label">Name</span>
+          <span class="field-value">{{ATTENDEE_NAME}}</span>
+        </div>
+        <div class="field">
+          <span class="field-label">Gender</span>
+          <span class="field-value">{{ATTENDEE_GENDER}}</span>
+        </div>
       </div>
-      <div class="field">
-        <span class="field-label">Gender</span>
-        <span class="field-value">{{ATTENDEE_GENDER}}</span>
-      </div>
-      <div class="field">
-        <span class="field-label">Email</span>
-        <span class="field-value field-value-sm">{{ATTENDEE_EMAIL}}</span>
-      </div>
-      <div class="field">
-        <span class="field-label">Phone</span>
-        <span class="field-value">{{ATTENDEE_MOBILE}}</span>
+      <div class="fields-row">
+        <div class="field">
+          <span class="field-label">Email</span>
+          <span class="field-value field-value-sm">{{ATTENDEE_EMAIL}}</span>
+        </div>
+        <div class="field">
+          <span class="field-label">Phone</span>
+          <span class="field-value">{{ATTENDEE_MOBILE}}</span>
+        </div>
       </div>
 
       <!-- QR Code -->
@@ -523,11 +759,15 @@
         <div class="qr-box">
           <img src="data:image/png;base64,{{QR_BASE64}}" alt="QR" />
         </div>
-        <div class="qr-label">Scan at Entry</div>
+        <span class="qr-label">Present at Entry</span>
       </div>
 
       <!-- Ticket ID -->
-      <div class="ticket-id">{{TICKET_ID}}</div>
+      <div class="ticket-id-row">
+        <span class="ticket-id-dot"></span>
+        <span class="ticket-id">{{TICKET_ID}}</span>
+        <span class="ticket-id-dot"></span>
+      </div>
 
       <!-- Barcode -->
       <div class="barcode-section">
@@ -539,7 +779,13 @@
   </div>
 
   <!-- ██ FOOTER ██ -->
-  <div class="footer-text">Electronically validated · One-time entry only · Non-transferable</div>
+  <div class="footer">
+    <span class="footer-text">Electronically Validated</span>
+    <span class="footer-dot"></span>
+    <span class="footer-text">One-Time Entry Only</span>
+    <span class="footer-dot"></span>
+    <span class="footer-text">Non-Transferable</span>
+  </div>
 
 </body>
 </html>

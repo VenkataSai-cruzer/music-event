@@ -26,13 +26,13 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/scanner" element={<Scan />} />
+        <Route path="/scan" element={<Scan />} />
         <Route path="/" element={<AdminLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/create" element={<CreateTicket />} />
           <Route path="scan-logs" element={<ScanLogs />} />
-          <Route path="scan" element={<Scan />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
