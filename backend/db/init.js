@@ -62,6 +62,16 @@ const createTables = async () => {
         console.log('Migration: old columns cleaned up');
       }
 
+      // Phase 2b: Add pdf_data BYTEA column for in-database PDF storage
+      const pdfDataCheck = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'tickets' AND column_name = 'pdf_data'
+      `);
+      if (pdfDataCheck.rows.length === 0) {
+        await pool.query(`ALTER TABLE tickets ADD COLUMN pdf_data BYTEA;`);
+        console.log('Migration: added pdf_data BYTEA column');
+      }
+
       // Phase 2: Clear old ticket data — only if old tables still exist (truly once-only)
       // Using activity_log/event_settings existence as marker means:
       //   - Old database: tables exist → DELETE tickets + drop tables → done

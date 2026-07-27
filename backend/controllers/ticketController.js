@@ -48,35 +48,30 @@ async function getDashboard(req, res, next) {
 
 /**
  * GET /api/tickets/download/:ticketId
- * Streams the PDF file. Auto-regenerates if missing (ephemeral filesystem).
+ * Serves the PDF from the database (pdf_data BYTEA column).
+ * Falls back to regenerating if pdf_data is null.
  */
 async function downloadTicket(req, res, next) {
   try {
     const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 
-    let pdfPath = ticket.pdf_path
-      ? path.join(__dirname, '..', 'public', ticket.pdf_path.replace(/^\//, ''))
-      : null;
-
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
+    // If pdf_data is null, regenerate the PDF
+    if (!ticket.pdf_data) {
       try {
         const updatedTicket = await ticketService.regeneratePDF(ticket.ticket_id);
-        pdfPath = updatedTicket.pdf_path
-          ? path.join(__dirname, '..', 'public', updatedTicket.pdf_path.replace(/^\//, ''))
-          : null;
+        if (!updatedTicket || !updatedTicket.pdf_data) {
+          return res.status(500).json({ error: 'Unable to generate PDF. Please try again.' });
+        }
+        ticket.pdf_data = updatedTicket.pdf_data;
       } catch (regErr) {
         return res.status(500).json({ error: 'Failed to regenerate PDF: ' + regErr.message });
       }
     }
 
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
-      return res.status(500).json({ error: 'Unable to generate PDF. Please try again.' });
-    }
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${ticket.ticket_id}.pdf"`);
-    fs.createReadStream(pdfPath).pipe(res);
+    res.send(ticket.pdf_data);
   } catch (err) {
     next(err);
   }

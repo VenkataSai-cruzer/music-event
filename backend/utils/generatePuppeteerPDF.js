@@ -79,7 +79,7 @@ process.on('SIGINT', () => closeBrowser());
  *
  * @param {Object} ticket - Ticket object with name, gender, email, mobile, ticket_id, qr_token.
  * @param {Buffer} qrBuffer - PNG buffer for the QR code.
- * @returns {Promise<string>} - Relative path to the generated PDF (e.g., /tickets/xxx.pdf).
+ * @returns {Promise<Buffer>} - PDF file buffer (stored in DB, not on disk).
  */
 async function generatePuppeteerPDF(ticket, qrBuffer) {
   const qrBase64 = qrBuffer.toString('base64');
@@ -150,7 +150,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   try {
     // Viewport matches the SVG dimensions exactly (1536×1024, 3:2 ratio)
     await page.setViewport({ width: 1536, height: 1024 });
-    page.setDefaultTimeout(60000);
+    page.setDefaultTimeout(120000);
 
     // Use networkidle0 to ensure all embedded images (QR, barcode) are fully loaded
     await page.setContent(html, {
@@ -161,12 +161,8 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     // Brief settle for final rendering (large SVG may need extra time)
     await new Promise(r => setTimeout(r, 1000));
 
-    const fileName = `${ticket.qr_token}.pdf`;
-    const filePath = path.join(TICKETS_DIR, fileName);
-
     // Landscape, single page, zero margins, print background, scale=1
-    await page.pdf({
-      path: filePath,
+    const pdfBuffer = await page.pdf({
       format: undefined,  // no format — use explicit dimensions
       width: '6in',
       height: '4in',
@@ -177,7 +173,12 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
       pageRanges: '1',  // force exactly ONE page
     });
 
-    return `/tickets/${fileName}`;
+    // Also write to disk as a fallback cache for static serving
+    const fileName = `${ticket.qr_token}.pdf`;
+    const filePath = path.join(TICKETS_DIR, fileName);
+    fs.writeFileSync(filePath, pdfBuffer);
+
+    return pdfBuffer;
   } finally {
     await page.close().catch(() => {});
   }

@@ -6,6 +6,7 @@ const generatePDF = require('../utils/generatePuppeteerPDF');
 
 /**
  * Creates a new ticket with QR (in-memory) and PDF generation.
+ * PDF buffer is stored directly in the database (pdf_data BYTEA).
  */
 async function createTicket(ticketData) {
   const { name, gender, email, mobile } = ticketData;
@@ -27,18 +28,18 @@ async function createTicket(ticketData) {
   const ticket = result.rows[0];
 
   try {
-    // Generate PDF with in-memory QR buffer
-    const pdfRelativePath = await generatePDF(ticket, qrBuffer);
+    // Generate PDF with in-memory QR buffer — returns Buffer
+    const pdfBuffer = await generatePDF(ticket, qrBuffer);
 
-    // Store the PDF path
+    // Store the PDF buffer directly in the database
     const updated = await pool.query(
-      `UPDATE tickets SET pdf_path = $1 WHERE id = $2 RETURNING *`,
-      [pdfRelativePath, ticket.id]
+      `UPDATE tickets SET pdf_data = $1 WHERE id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at`,
+      [pdfBuffer, ticket.id]
     );
 
     return updated.rows[0];
   } catch (pdfErr) {
-    // PDF generation failed — keep the ticket record (pdf_path remains NULL)
+    // PDF generation failed — keep the ticket record (pdf_data remains NULL)
     // The download endpoint will retry PDF generation via regeneratePDF()
     console.error(`[createTicket] PDF generation failed for ticket_id=${ticket.ticket_id}:`, pdfErr.message);
     // Return the ticket without a PDF — user can retry download later
@@ -148,7 +149,8 @@ async function deleteTicket(ticketId) {
 }
 
 /**
- * Regenerates PDF for an existing ticket (for Render's ephemeral filesystem).
+ * Regenerates PDF for an existing ticket.
+ * Stores the PDF buffer directly in the database (pdf_data BYTEA).
  * Generates QR on-the-fly from the stored UUID token.
  */
 async function regeneratePDF(ticketId) {
@@ -161,11 +163,11 @@ async function regeneratePDF(ticketId) {
 
   // Regenerate QR buffer from stored UUID
   const qrBuffer = await require('../utils/generateQR')(ticket.qr_token);
-  const pdfPath = await generatePDF(ticket, qrBuffer);
+  const pdfBuffer = await generatePDF(ticket, qrBuffer);
 
   const updated = await pool.query(
-    `UPDATE tickets SET pdf_path = $1 WHERE ticket_id = $2 RETURNING *`,
-    [pdfPath, ticketId]
+    `UPDATE tickets SET pdf_data = $1 WHERE ticket_id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at`,
+    [pdfBuffer, ticketId]
   );
   return updated.rows[0];
 }
