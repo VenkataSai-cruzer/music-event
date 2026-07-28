@@ -1,0 +1,8 @@
+Feat: Add demo data seeder and npm seed script
+
+- Create backend/db/seed.js with 25 realistic Indian-named demo registrations
+  (15 VALID, 8 USED, 3 CANCELLED across past 14 days)
+- Add "seed" npm script to backend/package.json
+- Each registration has unique UUID, proper timestamps, scanner attribution
+- Safe to run multiple times (skips if tickets already exist)
+- Syncs ticket_id_seq after seeding
