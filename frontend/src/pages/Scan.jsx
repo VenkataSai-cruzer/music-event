@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut, Ban } from 'lucide-react';
+import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut, Ban, ShieldCheck, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
 const QR_SCANNER_ID = 'qr-scanner';
-const RESULT_DISPLAY_MS = 1500;
+const RESULT_DISPLAY_MS = 2000;
 const POLL_INTERVAL_MS = 10000;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // ═══════════════════════════════════════════════════
-//  ERROR BOUNDARY — catches crashes, shows retry
+//  ERROR BOUNDARY
 // ═══════════════════════════════════════════════════
 class ScanErrorBoundary extends Component {
   constructor(props) {
@@ -23,14 +23,14 @@ class ScanErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-          <div className="max-w-sm w-full bg-white rounded-2xl border border-red-200 shadow-lg p-8 text-center">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+          <div className="max-w-sm w-full bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-8 text-center">
             <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Scanner Crashed</h2>
-            <p className="text-sm text-gray-500 mb-6">Something went wrong. Please refresh the page.</p>
+            <h2 className="text-lg font-bold text-white mb-2">Scanner Crashed</h2>
+            <p className="text-sm text-gray-400 mb-6">Something went wrong. Please refresh the page.</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+              className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all"
             >
               <RefreshCw className="w-4 h-4 inline mr-2" />Refresh Page
             </button>
@@ -79,7 +79,7 @@ export default function Scan() {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      gain.gain.value = 0.15;
+      gain.gain.value = 0.12;
       if (type === 'success') {
         osc.frequency.setValueAtTime(880, ctx.currentTime);
         osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
@@ -121,7 +121,6 @@ export default function Scan() {
   // ── Auto-start scanner after login ──
   useEffect(() => {
     if (loggedIn && scannerRef.current === null && !scanning && cameraStatus === 'idle') {
-      // Small delay to ensure DOM is committed with #qr-scanner div present
       const timer = setTimeout(() => doStartScanner(), 100);
       return () => clearTimeout(timer);
     }
@@ -129,10 +128,9 @@ export default function Scan() {
 
   const getScannedBy = useCallback(() => scannerInfo?.display_name || 'Scanner', [scannerInfo]);
 
-  // ── Lazy scanner factory (single instance, NEVER recreated if ref exists) ──
+  // ── Lazy scanner factory ──
   const getScanner = useCallback(() => {
     if (!scannerRef.current) {
-      // Verify the DOM element exists before creating Html5Qrcode
       const el = document.getElementById(QR_SCANNER_ID);
       if (!el) {
         console.error('[Scan] #qr-scanner div not in DOM yet');
@@ -187,13 +185,12 @@ export default function Scan() {
       }
       scannerRef.current = null;
       setResult(null);
-      // Small delay ensures React has committed the DOM update for result=null
       await new Promise(r => setTimeout(r, 50));
       await doStartScanner();
     })().catch(() => {});
   }, []);
 
-  // ── Core scanner start logic (extracted so resumeScanner can reference it without TDZ) ──
+  // ── Core scanner start logic ──
   const doStartScanner = useCallback(async () => {
     const scanner = getScanner();
     if (!scanner) {
@@ -209,24 +206,22 @@ export default function Scan() {
     setCameraError(null);
 
     try {
-      // Try rear camera first
       await scanner.start(
         { facingMode: 'environment' },
-        { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
+        { fps: 15, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
         (decodedText) => {
-          try { scanner.pause(); } catch (e) { /* not started */ }
+          try { scanner.pause(); } catch (e) { }
           setProcessing(true);
           handleVerifyScan(decodedText);
         },
-        () => {} // ignore useless scan results
+        () => {}
       );
       setCameraStatus('ready');
     } catch (err) {
-      // Rear camera failed — try front camera
       try {
         await scanner.start(
           { facingMode: 'user' },
-          { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1 },
+          { fps: 15, qrbox: { width: 260, height: 260 }, aspectRatio: 1 },
           (decodedText) => {
             try { scanner.pause(); } catch (e) {}
             setProcessing(true);
@@ -235,7 +230,7 @@ export default function Scan() {
           () => {}
         );
         setCameraStatus('ready');
-        setCameraError('Using front camera — QR may be harder to scan');
+        setCameraError('Using front camera');
       } catch (err2) {
         const msg = err2?.message || '';
         if (msg.includes('permission') || msg.includes('NotAllowed')) {
@@ -329,12 +324,9 @@ export default function Scan() {
 
   return (
     <ScanErrorBoundary>
-      {/* ════════════════════════════════════════════════ */}
-      {/*  QR SCANNER ELEMENT — ALWAYS IN DOM             */}
-      {/*  html5-qrcode instance stays valid across        */}
-      {/*  re-renders. Visible when scanner active,         */}
-      {/*  hidden off-screen when not.                     */}
-      {/* ════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════ */}
+      {/*  QR SCANNER ELEMENT — ALWAYS IN DOM      */}
+      {/* ══════════════════════════════════════════ */}
       <div
         id={QR_SCANNER_ID}
         style={showScanner ? {
@@ -354,201 +346,286 @@ export default function Scan() {
         }}
       />
 
-      {/* ═══════════════════════════════════ */}
-      {/*  SCANNER LOGIN VIEW                */}
-      {/* ═══════════════════════════════════ */}
+      {/* ══════════════════════════════════════════ */}
+      {/*  SCANNER LOGIN VIEW — Premium Dark       */}
+      {/* ══════════════════════════════════════════ */}
       {showLogin && (
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-          <div className="max-w-sm w-full bg-white rounded-2xl border border-gray-200 shadow-lg p-8">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <ScanIcon className="w-8 h-8 text-indigo-600" />
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+          <div className="w-full max-w-sm">
+            {/* Logo Area */}
+            <div className="text-center mb-8">
+              <div className="relative inline-flex mb-4">
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-500/30">
+                  <ScanIcon className="w-10 h-10 text-white" />
+                </div>
+                <div className="absolute -inset-1 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-3xl blur-xl opacity-40" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Scanner Login</h2>
-              <p className="text-sm text-gray-500">Sign in with your assigned scanner account</p>
+              <h1 className="text-2xl font-bold text-white mb-1">Event Scanner</h1>
+              <p className="text-sm text-gray-400">7 NOTES — Live Jamming Session</p>
             </div>
-            <div className="space-y-4 mb-4">
-              <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !loggingIn && handleScannerLogin()}
-                placeholder="e.g., gate_a"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all" autoFocus />
-              <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !loggingIn && handleScannerLogin()}
-                placeholder="Enter password"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all" />
+
+            {/* Login Card */}
+            <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 p-6 space-y-5">
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-white">Scanner Login</h2>
+                <p className="text-xs text-gray-400 mt-1">Sign in with your assigned account</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <input
+                    type="text" value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !loggingIn && handleScannerLogin()}
+                    placeholder="Username (e.g., gate_a)"
+                    className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password" value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !loggingIn && handleScannerLogin()}
+                    placeholder="Password"
+                    className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleScannerLogin}
+                disabled={loggingIn || !loginUsername.trim() || !loginPassword.trim()}
+                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 transition-all shadow-lg shadow-indigo-500/20"
+              >
+                {loggingIn ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Logging in...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <QrCode className="w-4 h-4" />
+                    Login & Start Scanning
+                  </span>
+                )}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                Default: gate_a, gate_b, vip / password: scan123
+              </p>
             </div>
-            <button onClick={handleScannerLogin} disabled={loggingIn || !loginUsername.trim() || !loginPassword.trim()}
-              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200">
-              {loggingIn ? 'Logging in...' : 'Login & Start Scanning'}
-            </button>
-            <p className="text-xs text-gray-400 text-center mt-4">
-              Default accounts: gate_a, gate_b, vip / password: scan123
-            </p>
           </div>
         </div>
       )}
 
-      {/* ═══════════════════════════════════ */}
-      {/*  RESULT OVERLAY                    */}
-      {/* ═══════════════════════════════════ */}
+      {/* ══════════════════════════════════════════ */}
+      {/*  RESULT OVERLAY — Bottom Sheet Style     */}
+      {/* ══════════════════════════════════════════ */}
       {showResult && <ScanResultOverlay result={result} getScannedBy={getScannedBy} resumeScanner={resumeScanner} />}
 
-      {/* ═══════════════════════════════════ */}
-      {/*  CAMERA PERMISSION DENIED          */}
-      {/* ═══════════════════════════════════ */}
-      {showPermissionError && (
-        <div className="max-w-lg mx-auto space-y-4">
-          <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
-            <CameraOff className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Camera Permission Required</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Allow camera access to scan tickets. Check your browser settings and refresh the page.
-            </p>
-            <button onClick={doStartScanner}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 mx-auto">
-              <RefreshCw className="w-4 h-4" /> Try Again
-            </button>
+      {/* ══════════════════════════════════════════ */}
+      {/*  CAMERA ERROR VIEWS                      */}
+      {/* ══════════════════════════════════════════ */}
+      {(showPermissionError || showNoCamera || showCameraError) && (
+        <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+          {/* Top bar */}
+          {loggedIn && (
+            <div className="flex items-center justify-between px-4 py-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-400 rounded-full" />
+                <span className="text-sm text-gray-300">{scannerInfo?.display_name || 'Scanner'}</span>
+              </div>
+              <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-400 transition-colors flex items-center gap-1">
+                <LogOut className="w-3 h-3" /> Logout
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="text-center max-w-sm">
+              {showPermissionError && (
+                <>
+                  <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <CameraOff className="w-10 h-10 text-red-400" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-2">Camera Access Needed</h2>
+                  <p className="text-sm text-gray-400 mb-6">Allow camera access to scan tickets. Check browser settings and retry.</p>
+                  <button onClick={doStartScanner}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all flex items-center gap-2 mx-auto">
+                    <RefreshCw className="w-4 h-4" /> Try Again
+                  </button>
+                </>
+              )}
+              {showNoCamera && (
+                <>
+                  <div className="w-20 h-20 bg-gray-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <CameraOff className="w-10 h-10 text-gray-500" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-2">No Camera Detected</h2>
+                  <p className="text-sm text-gray-400">Use a mobile phone or connect a webcam to scan tickets.</p>
+                </>
+              )}
+              {showCameraError && (
+                <>
+                  <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <AlertTriangle className="w-10 h-10 text-red-400" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-2">Camera Error</h2>
+                  <p className="text-sm text-gray-400 mb-2">{cameraError}</p>
+                  <button onClick={doStartScanner}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium transition-all flex items-center gap-2 mx-auto">
+                    <RefreshCw className="w-4 h-4" /> Retry
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ═══════════════════════════════════ */}
-      {/*  NO CAMERA DETECTED                */}
-      {/* ═══════════════════════════════════ */}
-      {showNoCamera && (
-        <div className="max-w-lg mx-auto space-y-4">
-          <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
-            <CameraOff className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">No Camera Detected</h2>
-            <p className="text-sm text-gray-500">
-              Use a mobile phone or connect a webcam to scan tickets.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════ */}
-      {/*  CAMERA ERROR                      */}
-      {/* ═══════════════════════════════════ */}
-      {showCameraError && (
-        <div className="max-w-lg mx-auto space-y-4">
-          <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
-            <CameraOff className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Camera Error</h2>
-            <p className="text-sm text-gray-500 mb-6">{cameraError}</p>
-            <button onClick={doStartScanner}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 mx-auto">
-              <RefreshCw className="w-4 h-4" /> Retry
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════ */}
-      {/*  MAIN SCANNER VIEW - full viewport  */}
-      {/*  Transparent background — camera feed from the     */}
-      {/*  always-in-DOM #qr-scanner sibling shows through.   */}
-      {/*  Overlays (loading, corners, processing) render     */}
-      {/*  on top of the camera feed.                         */}
-      {/* ═══════════════════════════════════ */}
+      {/* ══════════════════════════════════════════ */}
+      {/*  MAIN SCANNER VIEW — Full Screen Premium  */}
+      {/* ══════════════════════════════════════════ */}
       {showScanner && (
-        <div className="fixed inset-0 z-30 flex flex-col overflow-hidden">
-          {/* Scanner Status Bar */}
-          <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
+        <div className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-black">
+          {/* Top Bar — Glassmorphism */}
+          <div className="relative z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
+            <div className="flex items-center gap-2.5">
+              <div className={`w-2 h-2 rounded-full ${
+                cameraStatus === 'ready' ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50 animate-pulse' :
+                cameraStatus === 'loading' ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'
+              }`} />
+              <span className="text-sm text-white/80 font-medium">{scannerInfo?.display_name || 'Scanner'}</span>
+              <span className="text-xs text-white/40 hidden sm:inline">
+                {cameraStatus === 'ready' ? '● Live' : cameraStatus === 'loading' ? '● Starting...' : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Counter Badge */}
+              {counter.total > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-xs font-medium text-white">{counter.used}</span>
+                  <span className="text-xs text-white/30">/</span>
+                  <span className="text-xs font-medium text-white">{counter.total}</span>
+                </div>
+              )}
+              <button onClick={handleLogout} className="text-xs text-white/50 hover:text-red-400 transition-colors">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
-          {/* Camera Preview — fills remaining space */ }
-          <div className="flex-1 relative overflow-hidden">
-            {/* Camera-off overlay while loading */}
+          {/* Camera Area — fills remaining space */}
+          <div className="flex-1 relative">
+            {/* Dark vignette overlays */}
+            <div className="absolute inset-0 pointer-events-none z-10">
+              <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-black/60 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/60 to-transparent" />
+            </div>
+
+            {/* Loading overlay */}
             {(!scanning || cameraStatus === 'loading') && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center p-8 bg-black/60 rounded-2xl backdrop-blur-sm">
+              <div className="absolute inset-0 flex items-center justify-center z-20">
+                <div className="text-center">
                   {cameraStatus === 'loading' ? (
-                    <>
-                      <svg className="animate-spin w-12 h-12 text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                    <div className="bg-black/50 backdrop-blur-md rounded-2xl px-8 py-6">
+                      <svg className="animate-spin w-10 h-10 text-indigo-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      <p className="text-gray-200 text-sm">Starting camera...</p>
-                    </>
+                      <p className="text-white/80 text-sm">Starting camera...</p>
+                    </div>
                   ) : (
-                    <>
-                      <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <div className="bg-black/50 backdrop-blur-md rounded-2xl px-8 py-6">
+                      <Camera className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                       <p className="text-gray-400 text-sm">Camera is off</p>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* QR scanning boundary box & scan line overlay */}
+            {/* Premium Scan Frame */}
             {cameraStatus === 'ready' && scanning && (
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64">
-                  {/* Corner borders */}
-                  <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-400 rounded-tl-xl" />
-                  <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-400 rounded-tr-xl" />
-                  <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-400 rounded-bl-xl" />
-                  <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-indigo-400 rounded-br-xl" />
-                  {/* Scanning line */}
-                  <div className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-scan" />
+              <div className="absolute inset-0 pointer-events-none z-10">
+                {/* Scan frame */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                  <div className="relative w-64 h-64">
+                    {/* Glow behind corners */}
+                    <div className="absolute -inset-4 bg-indigo-500/10 rounded-3xl blur-2xl" />
+                    
+                    {/* Corner pieces with glow */}
+                    <div className="absolute -top-1 -left-1 w-14 h-14">
+                      <div className="absolute inset-0 border-t-[3px] border-l-[3px] border-indigo-400 rounded-tl-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-14 h-14">
+                      <div className="absolute inset-0 border-t-[3px] border-r-[3px] border-indigo-400 rounded-tr-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                    </div>
+                    <div className="absolute -bottom-1 -left-1 w-14 h-14">
+                      <div className="absolute inset-0 border-b-[3px] border-l-[3px] border-indigo-400 rounded-bl-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-14 h-14">
+                      <div className="absolute inset-0 border-b-[3px] border-r-[3px] border-indigo-400 rounded-br-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                    </div>
+
+                    {/* Scan line */}
+                    <div className="absolute left-3 right-3 h-0.5 bg-gradient-to-r from-transparent via-indigo-400 to-transparent shadow-[0_0_10px_rgba(99,102,241,0.5)] animate-scan-smooth" />
+                  </div>
                 </div>
-                {/* Instruction text */}
-                <div className="absolute bottom-12 left-0 right-0 text-center">
-                  <p className="text-white/90 text-sm font-medium drop-shadow-lg">
-                    Align QR code within the frame
+
+                {/* Instruction */}
+                <div className="absolute bottom-20 left-0 right-0 text-center px-8">
+                  <p className="text-white/90 text-sm font-medium tracking-wide drop-shadow-lg">
+                    Position QR code inside the frame
                   </p>
+                  <p className="text-white/40 text-xs mt-1.5">Auto-scans when detected</p>
                 </div>
               </div>
             )}
 
             {/* Processing overlay */}
             {processing && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 backdrop-blur-sm">
                 <div className="text-center">
-                  <svg className="animate-spin w-12 h-12 text-white mx-auto mb-3" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <p className="text-white text-sm">Verifying...</p>
+                  <div className="w-16 h-16 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="animate-spin w-8 h-8 text-indigo-400" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                  <p className="text-white/90 text-sm font-medium">Verifying Entry...</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Bottom Controls */}
-          <div className="bg-black/80 px-4 py-3 flex items-center justify-between border-t border-gray-800">
-            <div className="flex items-center gap-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${
-                cameraStatus === 'ready' ? 'bg-green-400 animate-pulse' :
-                cameraStatus === 'loading' ? 'bg-yellow-400 animate-pulse' :
-                'bg-gray-500'
-              }`} />
-              <span className="text-xs text-gray-400">
-                {cameraStatus === 'ready' ? 'Camera Ready' :
-                 cameraStatus === 'loading' ? 'Starting...' :
-                 'Stopped'}
-              </span>
-              {cameraError && cameraError !== 'permission_denied' && cameraError !== 'no_camera' && (
-                <span className="text-xs text-amber-400 ml-2">{cameraError}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Entry Counter Badge */}
-              {counter.total > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600/30 rounded-lg">
-                  <span className="text-xs text-indigo-300">Inside</span>
-                  <span className="text-sm font-bold text-white">{counter.used}</span>
-                  <span className="text-xs text-gray-500">/</span>
-                  <span className="text-sm font-bold text-white">{counter.total}</span>
-                </div>
-              )}
+          {/* Bottom Controls — Glassmorphism */}
+          <div className="relative z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pt-8 pb-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/50">
+                  {cameraError && cameraError !== 'permission_denied' && cameraError !== 'no_camera' ? (
+                    <span className="text-amber-400">{cameraError}</span>
+                  ) : cameraStatus === 'ready' ? (
+                    'Ready to scan'
+                  ) : cameraStatus === 'loading' ? (
+                    'Initializing...'
+                  ) : (
+                    'Camera stopped'
+                  )}
+                </span>
+              </div>
               <button
                 onClick={scanning ? stopScanner : doStartScanner}
-                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
-                  scanning ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                  scanning
+                    ? 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'
+                    : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30'
                 }`}
               >
                 {scanning ? 'Stop' : 'Start'}
@@ -560,12 +637,32 @@ export default function Scan() {
 
       {/* Inline styles */}
       <style>{`
-        @keyframes scanLine { 0%, 100% { top: 10%; } 50% { top: 85%; } }
-        .animate-scan { animation: scanLine 2.5s ease-in-out infinite; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        .animate-in { animation: fadeIn 0.2s ease-out; }
-        @keyframes shrinkWidth { from { width: 100%; } to { width: 0%; } }
+        @keyframes scanLineSmooth {
+          0%, 100% { top: 8%; }
+          50% { top: 88%; }
+        }
+        .animate-scan-smooth {
+          animation: scanLineSmooth 2.5s ease-in-out infinite;
+        }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-fade-slide {
+          animation: fadeSlideUp 0.3s ease-out;
+        }
+        @keyframes shrinkWidth {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
         .animate-shrink { animation: shrinkWidth ${RESULT_DISPLAY_MS}ms linear forwards; }
+        @keyframes successPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        .animate-success-pulse {
+          animation: successPulse 0.4s ease-in-out 2;
+        }
       `}</style>
     </ScanErrorBoundary>
   );
@@ -575,28 +672,12 @@ export default function Scan() {
 //  SUB-COMPONENTS
 // ═══════════════════════════════════════════════════
 
-function ScannerStatusBar({ scannerInfo, onLogout }) {
-  return (
-    <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-        <span className="text-sm font-medium text-gray-700">
-          {scannerInfo?.display_name || 'Scanner'}
-        </span>
-      </div>
-      <button onClick={onLogout} className="text-xs text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1">
-        <LogOut className="w-3 h-3" /> Logout
-      </button>
-    </div>
-  );
-}
-
-function ResultRow({ label, value }) {
+function ResultRow({ label, value, highlight }) {
   if (!value && value !== 0) return null;
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-gray-500 font-medium">{label}</span>
-      <span className="font-semibold text-gray-900">{value}</span>
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-xs uppercase tracking-wider text-gray-400">{label}</span>
+      <span className={`text-sm font-semibold text-right ${highlight ? 'text-indigo-600' : 'text-gray-900'}`}>{value}</span>
     </div>
   );
 }
@@ -609,120 +690,127 @@ function ScanResultOverlay({ result, getScannedBy, resumeScanner }) {
   const invalid = action === 'invalid' || resultType === 'INVALID';
   const networkError = action === 'network_error';
 
-  // Backend sends data in result.data (see ticketController verifyTicket)
   const d = result.data || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl animate-in">
-
-        {/* ENTRY APPROVED */}
+    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className={`w-full max-w-sm mx-auto bg-white rounded-3xl overflow-hidden shadow-2xl animate-fade-slide ${approved ? 'animate-success-pulse' : ''}`}>
+        {/* Header Section */}
         {approved && (
-          <>
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.15),transparent_70%)]" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 ring-4 ring-white/20">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-white">ENTRY APPROVED</h2>
-              <p className="text-sm text-green-100 mt-1">Welcome to 7 NOTES!</p>
+              <h2 className="text-2xl font-bold text-white tracking-tight">ENTRY APPROVED</h2>
+              <p className="text-emerald-100 text-sm mt-0.5">Welcome to 7 NOTES!</p>
             </div>
-            <div className="p-6 space-y-3">
-              <div className="bg-green-50 rounded-2xl p-4 space-y-2.5">
-                <ResultRow label="Name" value={d.attendeeName} />
-                <ResultRow label="Ticket" value={d.ticketId} />
-                <ResultRow label="Scanner" value={getScannedBy()} />
-                <ResultRow label="Time" value={new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
-              </div>
-            </div>
-          </>
+          </div>
         )}
 
-        {/* ALREADY SCANNED */}
         {used && (
-          <>
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.15),transparent_70%)]" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 ring-4 ring-white/20">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-white">ALREADY SCANNED</h2>
-              <p className="text-sm text-amber-100 mt-1">Entry was already approved</p>
+              <h2 className="text-2xl font-bold text-white tracking-tight">ALREADY SCANNED</h2>
+              <p className="text-amber-100 text-sm mt-0.5">Entry was already approved</p>
             </div>
-            <div className="p-6 space-y-3">
-              <div className="bg-amber-50 rounded-2xl p-4 space-y-2.5">
-                <ResultRow label="Name" value={d.attendeeName} />
-                <ResultRow label="Ticket" value={d.ticketId} />
-                <ResultRow label="Original Scanner" value={d.scannedBy} />
-                <ResultRow label="Scanned At" value={d.scannedAt ? new Date(d.scannedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null} />
-              </div>
-            </div>
-          </>
+          </div>
         )}
 
-        {/* CANCELLED */}
         {cancelled && (
-          <>
-            <div className="bg-gradient-to-r from-red-500 to-red-600 p-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.15),transparent_70%)]" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 ring-4 ring-white/20">
                 <Ban className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-white">REGISTRATION CANCELLED</h2>
-              <p className="text-sm text-red-100 mt-1">This registration is no longer valid</p>
+              <h2 className="text-2xl font-bold text-white tracking-tight">CANCELLED</h2>
+              <p className="text-red-100 text-sm mt-0.5">Registration no longer valid</p>
             </div>
-            <div className="p-6 space-y-3">
-              <p className="text-sm text-center text-gray-500">
-                Please ask the attendee to contact the organizer.
-              </p>
-            </div>
-          </>
+          </div>
         )}
 
-        {/* INVALID QR */}
         {invalid && (
-          <>
-            <div className="bg-gradient-to-r from-gray-600 to-gray-700 p-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="bg-gradient-to-r from-gray-600 to-gray-700 px-6 py-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.1),transparent_70%)]" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 ring-4 ring-white/20">
                 <AlertTriangle className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-white">INVALID QR</h2>
-              <p className="text-sm text-gray-300 mt-1">Not recognized in system</p>
+              <h2 className="text-2xl font-bold text-white tracking-tight">INVALID QR</h2>
+              <p className="text-gray-300 text-sm mt-0.5">Not recognized in system</p>
             </div>
-            <div className="p-6 space-y-3">
-              <p className="text-sm text-center text-gray-500">
-                Only official 7 NOTES tickets are accepted.
-              </p>
-            </div>
-          </>
+          </div>
         )}
 
-        {/* NETWORK ERROR */}
         {networkError && (
-          <>
-            <div className="bg-gradient-to-r from-red-500 to-red-600 p-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="bg-gradient-to-r from-red-500 to-rose-600 px-6 py-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.15),transparent_70%)]" />
+            <div className="relative">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 ring-4 ring-white/20">
                 <WifiOff className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-xl font-bold text-white">CONNECTION ERROR</h2>
-              <p className="text-sm text-red-100 mt-1">Unable to reach server</p>
+              <h2 className="text-2xl font-bold text-white tracking-tight">CONNECTION ERROR</h2>
+              <p className="text-red-100 text-sm mt-0.5">Unable to reach server</p>
             </div>
-            <div className="p-6 space-y-3">
-              <p className="text-sm text-center text-gray-500">
-                Check your internet connection and try again.
-              </p>
+          </div>
+        )}
+
+        {/* Body Section */}
+        <div className="px-6 py-5">
+          {approved && (
+            <div className="bg-emerald-50/80 rounded-2xl p-4 space-y-1 divide-y divide-emerald-100/50">
+              <ResultRow label="Name" value={d.attendeeName} highlight />
+              <ResultRow label="Ticket" value={d.ticketId} />
+              <ResultRow label="Scanner" value={getScannedBy()} />
+              <ResultRow label="Time" value={new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
+            </div>
+          )}
+
+          {used && (
+            <div className="bg-amber-50/80 rounded-2xl p-4 space-y-1 divide-y divide-amber-100/50">
+              <ResultRow label="Name" value={d.attendeeName} highlight />
+              <ResultRow label="Ticket" value={d.ticketId} />
+              <ResultRow label="Original Scan" value={d.scannedBy} />
+              <ResultRow label="Scanned At" value={d.scannedAt ? new Date(d.scannedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null} />
+            </div>
+          )}
+
+          {cancelled && (
+            <p className="text-sm text-center text-gray-500 py-2">
+              Please ask the attendee to contact the organizer.
+            </p>
+          )}
+
+          {invalid && (
+            <p className="text-sm text-center text-gray-500 py-2">
+              Only official 7 NOTES tickets are accepted.
+            </p>
+          )}
+
+          {networkError && (
+            <div className="space-y-3">
+              <p className="text-sm text-center text-gray-500">Check your internet connection and try again.</p>
               <button onClick={() => { resumeScanner(); }}
-                className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
+                className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4" /> Retry
               </button>
             </div>
-          </>
-        )}
+          )}
+        </div>
 
         {/* Auto-resume countdown bar */}
         <div className="h-1 bg-gray-100">
-          <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-shrink" />
+          <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-shrink rounded-full" />
         </div>
       </div>
     </div>
