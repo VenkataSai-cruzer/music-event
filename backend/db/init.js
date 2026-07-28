@@ -91,6 +91,58 @@ const createTables = async () => {
       console.log('Migration note:', migrateErr.message);
     }
 
+    // ── Phase 3: Add CANCELLED status, timestamps, and indexes ──
+    try {
+      // Add CANCELLED to status check constraint
+      await pool.query(`
+        ALTER TABLE tickets DROP CONSTRAINT IF EXISTS tickets_status_check;
+      `);
+      await pool.query(`
+        ALTER TABLE tickets ADD CONSTRAINT tickets_status_check
+        CHECK (status IN ('VALID', 'USED', 'CANCELLED'));
+      `);
+
+      // Add cancelled_at column
+      const cancelledAtCol = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'tickets' AND column_name = 'cancelled_at'
+      `);
+      if (cancelledAtCol.rows.length === 0) {
+        await pool.query(`ALTER TABLE tickets ADD COLUMN cancelled_at TIMESTAMPTZ;`);
+      }
+
+      // Add updated_at column
+      const updatedAtCol = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'tickets' AND column_name = 'updated_at'
+      `);
+      if (updatedAtCol.rows.length === 0) {
+        await pool.query(`ALTER TABLE tickets ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();`);
+      }
+
+      // Add indexes for performance
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tickets_uuid ON tickets (qr_token);`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tickets_ticket_id ON tickets (ticket_id);`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets (status);`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets (created_at);`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tickets_scanned_at ON tickets (scanned_at);`);
+
+      // Create ticket_id sequence for concurrent-safe ID generation
+      await pool.query(`CREATE SEQUENCE IF NOT EXISTS ticket_id_seq START 1;`);
+
+      // Sync sequence to max existing ticket ID to avoid collisions
+      const seqSync = await pool.query(`
+        SELECT COALESCE(MAX(CAST(SPLIT_PART(ticket_id, '-', 3) AS INTEGER)), 0) + 1 AS next_val
+        FROM tickets
+      `);
+      const nextVal = parseInt(seqSync.rows[0].next_val, 10) || 1;
+      await pool.query(`ALTER SEQUENCE ticket_id_seq RESTART WITH ${nextVal};`);
+
+      console.log('Migration: added CANCELLED status, timestamps, and indexes');
+    } catch (migrateErr) {
+      console.log('Migration note (Phase 3):', migrateErr.message);
+    }
+
     // Drop unused tables from old schema
     await pool.query(`DROP TABLE IF EXISTS activity_log;`);
     await pool.query(`DROP TABLE IF EXISTS event_settings;`);

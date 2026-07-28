@@ -12,6 +12,15 @@ export const ticketService = {
   download: (ticketId) =>
     api.get(`/tickets/download/${ticketId}`, { responseType: 'blob' }),
 
+  preview: (ticketId) =>
+    api.get(`/tickets/preview/${ticketId}`, { responseType: 'blob' }),
+
+  regeneratePDF: (ticketId) =>
+    api.post(`/tickets/${ticketId}/regenerate-pdf`),
+
+  cancel: (ticketId) =>
+    api.patch(`/tickets/${ticketId}/cancel`),
+
   verify: (qrToken, scannedBy) =>
     api.post('/tickets/verify', { qr_token: qrToken, scanned_by: scannedBy }),
 

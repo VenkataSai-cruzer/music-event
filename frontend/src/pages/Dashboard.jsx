@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Ticket, ScanLine, Users, CalendarDays, Clock } from 'lucide-react';
+import { RefreshCw, Ticket, ScanLine, CalendarDays, Ban } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
 import StatCard from '../components/StatCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -44,9 +44,9 @@ export default function Dashboard() {
 
       {/* Top Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Ticket} label="Tickets Generated" value={stats?.total} color="indigo" />
-        <StatCard icon={ScanLine} label="Tickets Used" value={stats?.used} color="green" />
-        <StatCard icon={Users} label="Remaining" value={stats?.remaining} color="amber" />
+        <StatCard icon={Ticket} label="Total Registrations" value={stats?.total} color="indigo" />
+        <StatCard icon={ScanLine} label="Entries Completed" value={stats?.used} color="green" />
+        <StatCard icon={Ban} label="Cancelled" value={stats?.cancelled} color="red" />
         <StatCard icon={CalendarDays} label="Today's Entries" value={stats?.todayScanned} color="blue" />
       </div>
 

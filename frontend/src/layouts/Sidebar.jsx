@@ -20,8 +20,8 @@ export default function Sidebar({ onLogout, onClose, mobileOpen }) {
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/tickets', icon: Ticket, label: 'Tickets' },
-    { to: '/tickets/create', icon: PlusCircle, label: 'Create Ticket' },
+    { to: '/tickets', icon: Ticket, label: 'Registrations' },
+    { to: '/tickets/create', icon: PlusCircle, label: 'Create Registration' },
     { to: '/scan-logs', icon: History, label: 'Scan Logs' },
     { to: '/scan', icon: ScanQrCode, label: 'Scan QR' },
   ];
@@ -48,7 +48,7 @@ export default function Sidebar({ onLogout, onClose, mobileOpen }) {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">7 NOTES</h1>
-                <p className="text-xs text-gray-500">Ticket Manager</p>
+                <p className="text-xs text-gray-500">Event Manager</p>
               </div>
             </div>
             <button

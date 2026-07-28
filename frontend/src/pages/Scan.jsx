@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
+import { Camera, CameraOff, ScanIcon, WifiOff, AlertTriangle, RefreshCw, LogOut, Ban } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -581,9 +581,10 @@ function ResultRow({ label, value }) {
 }
 
 function ScanResultOverlay({ result, getScannedBy, resumeScanner }) {
-  const { action } = result;
+  const { action, result: resultType } = result;
   const approved = action === 'approved';
   const used = action === 'already_used';
+  const cancelled = action === 'cancelled' || resultType === 'CANCELLED';
   const invalid = action === 'invalid';
   const networkError = action === 'network_error';
 
@@ -635,6 +636,24 @@ function ScanResultOverlay({ result, getScannedBy, resumeScanner }) {
                   <ResultRow label="Time" value={new Date(result.ticket.scanned_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
                 )}
               </div>
+            </div>
+          </>
+        )}
+
+        {/* CANCELLED */}
+        {cancelled && (
+          <>
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-8 text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Ban className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-white">REGISTRATION CANCELLED</h2>
+              <p className="text-sm text-red-100 mt-1">This registration is no longer valid</p>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-center text-gray-500">
+                Please ask the attendee to contact the organizer.
+              </p>
             </div>
           </>
         )}

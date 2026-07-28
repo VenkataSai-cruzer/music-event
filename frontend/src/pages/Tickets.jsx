@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Download, Eye, RefreshCw, Ban, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ticketService } from '../services/ticketService';
 import Modal from '../components/Modal';
@@ -11,7 +11,10 @@ export default function Tickets() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState(null);
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -21,7 +24,7 @@ export default function Tickets() {
       const res = await ticketService.getAll(params);
       setData(res.data);
     } catch (err) {
-      toast.error('Failed to load tickets');
+      toast.error('Failed to load registrations');
     } finally {
       setLoading(false);
     }
@@ -37,6 +40,25 @@ export default function Tickets() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const openPdfInTab = async (ticketId) => {
+    try {
+      const res = await ticketService.preview(ticketId);
+      if (res.data.type === 'application/json') {
+        const text = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsText(res.data);
+        });
+        const errData = JSON.parse(text);
+        throw new Error(errData.message || 'PDF preview failed');
+      }
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error(err.message || 'Failed to preview PDF');
+    }
+  };
+
   const handleDownload = async (ticketId) => {
     try {
       const res = await ticketService.download(ticketId);
@@ -47,12 +69,12 @@ export default function Tickets() {
           reader.readAsText(res.data);
         });
         const errData = JSON.parse(text);
-        throw new Error(errData.error || 'PDF generation failed');
+        throw new Error(errData.message || errData.error || 'PDF generation failed');
       }
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${ticketId}.pdf`);
+      link.setAttribute('download', `registration-${ticketId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -63,16 +85,44 @@ export default function Tickets() {
     }
   };
 
+  const handleRegenerate = async (ticketId) => {
+    setRegeneratingId(ticketId);
+    try {
+      await ticketService.regeneratePDF(ticketId);
+      toast.success('PDF regenerated successfully');
+      fetchTickets();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to regenerate PDF');
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await ticketService.cancel(cancelTarget);
+      toast.success('Registration cancelled');
+      setCancelTarget(null);
+      fetchTickets();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to cancel registration');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
       await ticketService.delete(deleteTarget);
-      toast.success('Ticket deleted');
+      toast.success('Registration deleted');
       setDeleteTarget(null);
       fetchTickets();
     } catch (err) {
-      toast.error('Failed to delete ticket');
+      toast.error('Failed to delete registration');
     } finally {
       setDeleting(false);
     }
@@ -92,8 +142,8 @@ export default function Tickets() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-          <p className="text-gray-500 mt-1">{data.pagination.total} total tickets</p>
+          <h1 className="text-2xl font-bold text-gray-900">Registrations</h1>
+          <p className="text-gray-500 mt-1">{data.pagination.total} total registrations</p>
         </div>
       </div>
 
@@ -114,7 +164,7 @@ export default function Tickets() {
         <div className="py-20"><LoadingSpinner /></div>
       ) : data.tickets.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border border-gray-200">
-          <p className="text-gray-400">No tickets found</p>
+          <p className="text-gray-400">No registrations found</p>
         </div>
       ) : (
         <>
@@ -146,12 +196,36 @@ export default function Tickets() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            onClick={() => openPdfInTab(ticket.ticket_id)}
+                            className="p-2 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                            title="Preview PDF"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleDownload(ticket.ticket_id)}
                             className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-600 transition-colors"
                             title="Download PDF"
                           >
                             <Download className="w-4 h-4" />
                           </button>
+                          <button
+                            onClick={() => handleRegenerate(ticket.ticket_id)}
+                            disabled={regeneratingId === ticket.ticket_id}
+                            className="p-2 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors disabled:opacity-40"
+                            title="Regenerate PDF"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${regeneratingId === ticket.ticket_id ? 'animate-spin' : ''}`} />
+                          </button>
+                          {ticket.status === 'VALID' && (
+                            <button
+                              onClick={() => setCancelTarget(ticket.ticket_id)}
+                              className="p-2 rounded-lg hover:bg-orange-50 text-orange-600 transition-colors"
+                              title="Cancel"
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => setDeleteTarget(ticket.ticket_id)}
                             className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition-colors"
@@ -193,14 +267,40 @@ export default function Tickets() {
         </>
       )}
 
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        title="Cancel Registration"
+      >
+        <p className="text-gray-600 mb-6">
+          Are you sure you want to cancel <strong>{cancelTarget}</strong>? This will prevent entry.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setCancelTarget(null)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Keep Active
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-60 transition-colors"
+          >
+            {cancelling ? 'Cancelling...' : 'Cancel Registration'}
+          </button>
+        </div>
+      </Modal>
+
       {/* Delete Confirmation Modal */}
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Delete Ticket"
+        title="Delete Registration"
       >
         <p className="text-gray-600 mb-6">
-          Are you sure you want to delete ticket <strong>{deleteTarget}</strong>? This action cannot be undone.
+          Are you sure you want to delete <strong>{deleteTarget}</strong>? This action cannot be undone.
         </p>
         <div className="flex gap-3">
           <button

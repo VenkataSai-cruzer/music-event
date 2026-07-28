@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { TicketPlus, ArrowLeft, Download, CheckCircle } from 'lucide-react';
+import { TicketPlus, ArrowLeft, Download, Eye, CheckCircle } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
 
 export default function CreateTicket() {
@@ -10,6 +10,7 @@ export default function CreateTicket() {
   const [submitting, setSubmitting] = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [downloadStarted, setDownloadStarted] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
@@ -25,12 +26,12 @@ export default function CreateTicket() {
           reader.readAsText(res.data);
         });
         const errData = JSON.parse(text);
-        throw new Error(errData.error || 'PDF generation failed');
+        throw new Error(errData.message || errData.error || 'PDF generation failed');
       }
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${ticketId}.pdf`);
+      link.setAttribute('download', `registration-${ticketId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -44,24 +45,45 @@ export default function CreateTicket() {
     }
   };
 
+  const doPreview = async (ticketId) => {
+    setPreviewing(true);
+    try {
+      const res = await ticketService.preview(ticketId);
+      if (res.data.type === 'application/json') {
+        const text = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsText(res.data);
+        });
+        const errData = JSON.parse(text);
+        throw new Error(errData.message || 'PDF preview failed');
+      }
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      window.open(url, '_blank');
+    } catch (err) {
+      toast.error(err.message || 'Failed to preview PDF');
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const onSubmit = async (data) => {
     setSubmitting(true);
     try {
       const res = await ticketService.create(data);
-      const ticket = res.data.ticket;
+      const ticket = res.data.data;
       setCreatedTicket(ticket);
-      toast.success(`Ticket ${ticket.ticket_id} created!`);
+      toast.success(`Registration ${ticket.ticketId} created!`);
 
-      // Auto-download PDF only if generation succeeded (pdf_path exists)
-      if (ticket.pdf_path) {
-        await doDownload(ticket.ticket_id);
+      // Auto-download PDF only if generation succeeded
+      if (ticket.hasPdf) {
+        await doDownload(ticket.ticketId);
       } else {
-        // PDF is still generating or failed — show success with download button
         setDownloadStarted(true);
         toast('PDF is being generated — click Download to retrieve it', { icon: '⏳' });
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to create ticket');
+      toast.error(err.response?.data?.message || 'Failed to create registration');
     } finally {
       setSubmitting(false);
     }
@@ -71,10 +93,6 @@ export default function CreateTicket() {
     setCreatedTicket(null);
     setDownloadStarted(false);
     reset();
-  };
-
-  const handleDownloadAgain = () => {
-    if (createdTicket?.ticket_id) doDownload(createdTicket.ticket_id);
   };
 
   const inputClass = (fieldError) =>
@@ -90,27 +108,35 @@ export default function CreateTicket() {
           <CheckCircle className="w-8 h-8 text-green-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ticket Generated</h1>
-          <p className="text-gray-500 text-sm mt-1">{createdTicket.ticket_id}</p>
-          <p className="text-gray-500 text-xs mt-1">PDF downloaded automatically</p>
+          <h1 className="text-2xl font-bold text-gray-900">Registration Created</h1>
+          <p className="text-gray-500 text-sm mt-1">{createdTicket.ticketId}</p>
+          <p className="text-gray-400 text-xs mt-1">PDF downloaded automatically</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-left space-y-2 text-sm">
-          <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-medium">{createdTicket.name}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500">Mobile</span><span className="font-medium">{createdTicket.mobile}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-medium">{createdTicket.attendee?.fullName}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Mobile</span><span className="font-medium">{createdTicket.attendee?.mobile}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Status</span><span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{createdTicket.status}</span></div>
         </div>
         <div className="flex gap-3">
           <button onClick={createAnother} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
             Create Another
           </button>
           <button
-            onClick={handleDownloadAgain}
+            onClick={() => doPreview(createdTicket.ticketId)}
+            disabled={previewing}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 border border-indigo-300 text-indigo-700 rounded-lg font-medium hover:bg-indigo-50 disabled:opacity-60 transition-colors"
+          >
+            <Eye className="w-4 h-4" /> Preview
+          </button>
+          <button
+            onClick={() => doDownload(createdTicket.ticketId)}
             disabled={downloading}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
           >
             {downloading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
-              <><Download className="w-4 h-4" /> Download Again</>
+              <><Download className="w-4 h-4" /> Download</>
             )}
           </button>
         </div>
@@ -126,8 +152,8 @@ export default function CreateTicket() {
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Ticket</h1>
-          <p className="text-gray-500 text-sm">7 NOTES Live Jamming Session</p>
+          <h1 className="text-2xl font-bold text-gray-900">Create Registration</h1>
+          <p className="text-gray-500 text-sm">7 NOTES – Live Jamming Session</p>
         </div>
       </div>
 
@@ -169,10 +195,10 @@ export default function CreateTicket() {
             {submitting ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating Ticket & PDF...
+                Creating Registration & PDF...
               </>
             ) : (
-              <><TicketPlus className="w-4 h-4" /> Generate Ticket</>
+              <><TicketPlus className="w-4 h-4" /> Create Registration</>
             )}
           </button>
         </form>

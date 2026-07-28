@@ -2,13 +2,46 @@ const ticketService = require('../services/ticketService');
 
 /**
  * POST /api/tickets
- * Creates a new ticket with immediate PDF generation.
+ * Creates a new registration with immediate PDF generation.
  */
 async function createTicket(req, res, next) {
   try {
     const { name, gender, email, mobile } = req.body;
-    const ticket = await ticketService.createTicket({ name, gender, email, mobile });
-    return res.status(201).json({ message: 'Ticket created successfully', ticket });
+
+    // Server-side validation
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Full name is required.', code: 'VALIDATION_ERROR' });
+    }
+    if (!gender) {
+      return res.status(400).json({ success: false, message: 'Gender is required.', code: 'VALIDATION_ERROR' });
+    }
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, message: 'Email is required.', code: 'VALIDATION_ERROR' });
+    }
+    if (!mobile || !mobile.trim()) {
+      return res.status(400).json({ success: false, message: 'Mobile number is required.', code: 'VALIDATION_ERROR' });
+    }
+
+    const ticket = await ticketService.createTicket({ name: name.trim(), gender, email: email.trim().toLowerCase(), mobile: mobile.trim() });
+    return res.status(201).json({
+      success: true,
+      message: 'Registration created successfully.',
+      data: {
+        id: ticket.id,
+        ticketId: ticket.ticket_id,
+        status: ticket.status,
+        attendee: {
+          fullName: ticket.name,
+          gender: ticket.gender,
+          email: ticket.email,
+          mobile: ticket.mobile,
+        },
+        createdAt: ticket.created_at,
+        hasPdf: !!ticket.pdf_data,
+        downloadUrl: `/api/tickets/download/${ticket.ticket_id}`,
+        previewUrl: `/api/tickets/preview/${ticket.ticket_id}`,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -26,7 +59,7 @@ async function getAllTickets(req, res, next) {
       page: parseInt(page, 10) || 1,
       limit: parseInt(limit, 10) || 20,
     });
-    return res.json(result);
+    return res.json({ success: true, ...result });
   } catch (err) {
     next(err);
   }
@@ -38,7 +71,7 @@ async function getAllTickets(req, res, next) {
 async function getDashboard(req, res, next) {
   try {
     const stats = await ticketService.getDashboardStats();
-    return res.json(stats);
+    return res.json({ success: true, ...stats });
   } catch (err) {
     next(err);
   }
@@ -46,29 +79,30 @@ async function getDashboard(req, res, next) {
 
 /**
  * GET /api/tickets/download/:ticketId
- * Serves the PDF from the database (pdf_data BYTEA column).
- * Falls back to regenerating if pdf_data is null.
+ * Serves the PDF as attachment (download).
  */
 async function downloadTicket(req, res, next) {
   try {
     const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
-    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    if (!ticket) return res.status(404).json({ success: false, message: 'Registration not found.', code: 'NOT_FOUND' });
 
     // If pdf_data is null, regenerate the PDF
     if (!ticket.pdf_data) {
       try {
         const updatedTicket = await ticketService.regeneratePDF(ticket.ticket_id);
         if (!updatedTicket || !updatedTicket.pdf_data) {
-          return res.status(500).json({ error: 'Unable to generate PDF. Please try again.' });
+          return res.status(500).json({ success: false, message: 'Unable to generate PDF. Please try again.', code: 'PDF_ERROR' });
         }
         ticket.pdf_data = updatedTicket.pdf_data;
       } catch (regErr) {
-        return res.status(500).json({ error: 'Failed to regenerate PDF: ' + regErr.message });
+        return res.status(500).json({ success: false, message: 'Failed to regenerate PDF: ' + regErr.message, code: 'PDF_ERROR' });
       }
     }
 
+    const filename = `registration-${ticket.ticket_id}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${ticket.ticket_id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', ticket.pdf_data.length);
     res.send(ticket.pdf_data);
   } catch (err) {
     next(err);
@@ -76,13 +110,72 @@ async function downloadTicket(req, res, next) {
 }
 
 /**
+ * GET /api/tickets/preview/:ticketId
+ * Serves the PDF inline (browser preview).
+ */
+async function previewTicket(req, res, next) {
+  try {
+    const ticket = await ticketService.getTicketByTicketId(req.params.ticketId);
+    if (!ticket) return res.status(404).json({ success: false, message: 'Registration not found.', code: 'NOT_FOUND' });
+
+    // If pdf_data is null, regenerate the PDF
+    if (!ticket.pdf_data) {
+      try {
+        const updatedTicket = await ticketService.regeneratePDF(ticket.ticket_id);
+        if (!updatedTicket || !updatedTicket.pdf_data) {
+          return res.status(500).json({ success: false, message: 'Unable to generate PDF. Please try again.', code: 'PDF_ERROR' });
+        }
+        ticket.pdf_data = updatedTicket.pdf_data;
+      } catch (regErr) {
+        return res.status(500).json({ success: false, message: 'Failed to generate PDF: ' + regErr.message, code: 'PDF_ERROR' });
+      }
+    }
+
+    const filename = `registration-${ticket.ticket_id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', ticket.pdf_data.length);
+    res.send(ticket.pdf_data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/tickets/:id/regenerate-pdf
+ * Regenerates the PDF for an existing ticket without changing any data.
+ */
+async function regenerateTicketPDF(req, res, next) {
+  try {
+    const ticketId = req.params.ticketId;
+    const updated = await ticketService.regeneratePDF(ticketId);
+    return res.json({
+      success: true,
+      message: 'PDF regenerated successfully.',
+      data: {
+        ticketId: updated.ticket_id,
+        downloadUrl: `/api/tickets/download/${updated.ticket_id}`,
+        previewUrl: `/api/tickets/preview/${updated.ticket_id}`,
+      },
+    });
+  } catch (err) {
+    if (err.statusCode === 404) {
+      return res.status(404).json({ success: false, message: err.message, code: 'NOT_FOUND' });
+    }
+    next(err);
+  }
+}
+
+/**
  * POST /api/tickets/verify
- * Atomic verify + approve. Only returns VALID/USED/INVALID.
+ * Atomic verify + approve. Returns APPROVED/USED/CANCELLED/INVALID.
  */
 async function verifyTicket(req, res, next) {
   try {
     const { qr_token } = req.body;
-    if (!qr_token) return res.status(400).json({ error: 'qr_token is required' });
+    if (!qr_token) {
+      return res.status(400).json({ success: false, message: 'QR token is required.', code: 'VALIDATION_ERROR' });
+    }
 
     let scannedBy = req.body.scanned_by;
     if (req.admin) {
@@ -92,35 +185,82 @@ async function verifyTicket(req, res, next) {
 
     const { ticket, action } = await ticketService.verifyAndApprove(qr_token, scannedBy);
 
-    if (!ticket) {
-      return res.status(404).json({ valid: false, action: 'invalid', error: 'Invalid QR code' });
+    if (action === 'invalid') {
+      return res.status(404).json({
+        success: false,
+        result: 'INVALID',
+        message: 'Registration not found.',
+      });
+    }
+
+    if (action === 'cancelled') {
+      return res.json({
+        success: false,
+        result: 'CANCELLED',
+        action: 'cancelled',
+        message: 'This registration has been cancelled.',
+      });
     }
 
     if (action === 'already_used') {
       return res.json({
-        valid: false,
+        success: false,
+        result: 'ALREADY_USED',
         action: 'already_used',
-        ticket: {
-          ticket_id: ticket.ticket_id,
-          name: ticket.name,
-          scanned_at: ticket.scanned_at,
-          scanned_by: ticket.scanned_by,
+        message: 'This registration has already been used.',
+        data: {
+          ticketId: ticket.ticket_id,
+          attendeeName: ticket.name,
+          scannedAt: ticket.scanned_at,
+          scannedBy: ticket.scanned_by,
         },
       });
     }
 
     // Entry approved
     return res.json({
-      valid: true,
+      success: true,
+      result: 'APPROVED',
       action: 'approved',
-      ticket: {
-        ticket_id: ticket.ticket_id,
-        name: ticket.name,
-        scanned_at: ticket.scanned_at,
-        scanned_by: ticket.scanned_by,
+      message: 'Entry approved.',
+      data: {
+        ticketId: ticket.ticket_id,
+        attendeeName: ticket.name,
+        status: ticket.status,
+        scannedAt: ticket.scanned_at,
+        scannedBy: ticket.scanned_by,
       },
     });
   } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/tickets/:ticketId/cancel
+ * Cancels a VALID registration.
+ */
+async function cancelTicket(req, res, next) {
+  try {
+    const ticketId = req.params.ticketId;
+    const cancelledBy = req.admin?.username || 'admin';
+    const ticket = await ticketService.cancelTicket(ticketId, cancelledBy);
+    return res.json({
+      success: true,
+      message: 'Registration cancelled successfully.',
+      data: {
+        ticketId: ticket.ticket_id,
+        status: ticket.status,
+        cancelledAt: ticket.cancelled_at,
+      },
+    });
+  } catch (err) {
+    if (err.statusCode === 404) {
+      return res.status(404).json({ success: false, message: err.message, code: 'NOT_FOUND' });
+    }
+    if (err.statusCode === 409) {
+      return res.status(409).json({ success: false, message: err.message, code: 'CONFLICT' });
+    }
     next(err);
   }
 }
@@ -131,15 +271,17 @@ async function verifyTicket(req, res, next) {
 async function useTicket(req, res, next) {
   try {
     const ticket = await ticketService.useTicket(req.params.ticketId);
-    return res.json({ message: 'Entry approved', ticket });
+    return res.json({ success: true, message: 'Entry approved', data: { ticket } });
   } catch (err) {
     if (err.statusCode === 409) {
       return res.status(409).json({
-        error: err.message,
-        ticket: err.ticket ? { ticket_id: err.ticket.ticket_id, name: err.ticket.name, status: err.ticket.status, scanned_at: err.ticket.scanned_at } : undefined,
+        success: false,
+        message: err.message,
+        code: 'CONFLICT',
+        data: err.ticket ? { ticketId: err.ticket.ticket_id, name: err.ticket.name, status: err.ticket.status, scannedAt: err.ticket.scanned_at } : undefined,
       });
     }
-    if (err.statusCode === 404) return res.status(404).json({ error: err.message });
+    if (err.statusCode === 404) return res.status(404).json({ success: false, message: err.message, code: 'NOT_FOUND' });
     next(err);
   }
 }
@@ -150,8 +292,8 @@ async function useTicket(req, res, next) {
 async function deleteTicket(req, res, next) {
   try {
     const ticket = await ticketService.deleteTicket(req.params.ticketId);
-    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
-    return res.json({ message: 'Ticket deleted successfully' });
+    if (!ticket) return res.status(404).json({ success: false, message: 'Registration not found.', code: 'NOT_FOUND' });
+    return res.json({ success: true, message: 'Registration deleted successfully.' });
   } catch (err) {
     next(err);
   }
@@ -168,10 +310,10 @@ async function getScanLogs(req, res, next) {
       page: parseInt(page, 10) || 1,
       limit: parseInt(limit, 10) || 30,
     });
-    return res.json(result);
+    return res.json({ success: true, ...result });
   } catch (err) {
     next(err);
   }
 }
 
-module.exports = { createTicket, getAllTickets, getDashboard, downloadTicket, verifyTicket, useTicket, deleteTicket, getScanLogs };
+module.exports = { createTicket, getAllTickets, getDashboard, downloadTicket, previewTicket, regenerateTicketPDF, verifyTicket, cancelTicket, useTicket, deleteTicket, getScanLogs };

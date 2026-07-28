@@ -7,6 +7,7 @@ const generatePDF = require('../utils/generatePDF');
 /**
  * Creates a new ticket with QR (in-memory) and PDF generation.
  * PDF buffer is stored directly in the database (pdf_data BYTEA).
+ * Flow: validate → insert into DB → read back → generate PDF from stored record → update pdf_data
  */
 async function createTicket(ticketData) {
   const { name, gender, email, mobile } = ticketData;
@@ -17,7 +18,7 @@ async function createTicket(ticketData) {
   // Generate QR code buffer (in-memory, no file saved)
   const qrBuffer = await generateQR(qrToken);
 
-  // Insert ticket into database (no qr_path — store only UUID)
+  // Insert ticket into database
   const result = await pool.query(
     `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, status)
      VALUES ($1, $2, $3, $4, $5, $6, 'VALID')
@@ -28,12 +29,14 @@ async function createTicket(ticketData) {
   const ticket = result.rows[0];
 
   try {
-    // Generate PDF with in-memory QR buffer — returns Buffer
+    // Generate PDF from the stored database record — guarantees consistency
     const pdfBuffer = await generatePDF(ticket, qrBuffer);
 
     // Store the PDF buffer directly in the database
     const updated = await pool.query(
-      `UPDATE tickets SET pdf_data = $1 WHERE id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at, pdf_data`,
+      `UPDATE tickets SET pdf_data = $1, updated_at = NOW() WHERE id = $2
+       RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status,
+                 scanned_by, scanned_at, created_at, updated_at, pdf_data`,
       [pdfBuffer, ticket.id]
     );
 
@@ -42,13 +45,13 @@ async function createTicket(ticketData) {
     // PDF generation failed — keep the ticket record (pdf_data remains NULL)
     // The download endpoint will retry PDF generation via regeneratePDF()
     console.error(`[createTicket] PDF generation failed for ticket_id=${ticket.ticket_id}:`, pdfErr.message);
-    // Return the ticket without a PDF — user can retry download later
     return ticket;
   }
 }
 
 /**
  * Retrieves all tickets with optional search and pagination.
+ * Excludes pdf_data from list queries for performance.
  */
 async function getAllTickets({ search, page = 1, limit = 20 }) {
   const offset = (page - 1) * limit;
@@ -66,7 +69,11 @@ async function getAllTickets({ search, page = 1, limit = 20 }) {
   const total = parseInt(countResult.rows[0].count, 10);
 
   const result = await pool.query(
-    `SELECT id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at FROM tickets ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    `SELECT id, ticket_id, qr_token, name, gender, email, mobile, status,
+            scanned_by, scanned_at, created_at, updated_at
+     FROM tickets ${whereClause}
+     ORDER BY created_at DESC
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
     [...params, limit, offset]
   );
 
@@ -88,17 +95,22 @@ async function getTicketByTicketId(ticketId) {
 
 /**
  * Verifies a QR token (UUID). If VALID, atomically approves entry.
+ * Handles: APPROVED, ALREADY_USED, CANCELLED, INVALID
+ * Uses atomic UPDATE ... RETURNING for concurrency safety.
  */
 async function verifyAndApprove(qrToken, scannedBy) {
+  // Step 1: Check if ticket exists
   const ticketResult = await pool.query('SELECT * FROM tickets WHERE qr_token = $1', [qrToken]);
   const ticket = ticketResult.rows[0];
 
   if (!ticket) return { ticket: null, action: 'invalid' };
+
+  if (ticket.status === 'CANCELLED') return { ticket, action: 'cancelled' };
   if (ticket.status === 'USED') return { ticket, action: 'already_used' };
 
   // Atomically approve entry (VALID → USED) — prevents race conditions
   const updateResult = await pool.query(
-    `UPDATE tickets SET status = 'USED', scanned_at = NOW(), scanned_by = $1
+    `UPDATE tickets SET status = 'USED', scanned_at = NOW(), scanned_by = $1, updated_at = NOW()
      WHERE qr_token = $2 AND status = 'VALID'
      RETURNING *`,
     [scannedBy || null, qrToken]
@@ -107,14 +119,16 @@ async function verifyAndApprove(qrToken, scannedBy) {
   // Race condition: another scanner already approved
   if (updateResult.rows.length === 0) {
     const refreshed = await pool.query('SELECT * FROM tickets WHERE qr_token = $1', [qrToken]);
-    return { ticket: refreshed.rows[0] || ticket, action: 'already_used' };
+    const refreshedTicket = refreshed.rows[0];
+    if (refreshedTicket.status === 'CANCELLED') return { ticket: refreshedTicket, action: 'cancelled' };
+    return { ticket: refreshedTicket || ticket, action: 'already_used' };
   }
 
   return { ticket: updateResult.rows[0], action: 'approved' };
 }
 
 /**
- * Marks a ticket as USED by ticket ID lookup.
+ * Marks a ticket as USED by ticket ID lookup (non-atomic fallback).
  */
 async function useTicket(ticketId) {
   const ticket = await getTicketByTicketId(ticketId);
@@ -129,16 +143,60 @@ async function useTicket(ticketId) {
     error.ticket = ticket;
     throw error;
   }
+  if (ticket.status === 'CANCELLED') {
+    const error = new Error('Ticket has been cancelled');
+    error.statusCode = 409;
+    error.ticket = ticket;
+    throw error;
+  }
 
   const result = await pool.query(
-    `UPDATE tickets SET status = 'USED', scanned_at = NOW() WHERE ticket_id = $1 RETURNING *`,
+    `UPDATE tickets SET status = 'USED', scanned_at = NOW(), updated_at = NOW()
+     WHERE ticket_id = $1 RETURNING *`,
     [ticketId]
   );
   return result.rows[0];
 }
 
 /**
- * Deletes a ticket.
+ * Cancels a VALID ticket.
+ */
+async function cancelTicket(ticketId, cancelledBy) {
+  const ticket = await getTicketByTicketId(ticketId);
+  if (!ticket) {
+    const error = new Error('Registration not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (ticket.status === 'USED') {
+    const error = new Error('Cannot cancel a registration that has already been used');
+    error.statusCode = 409;
+    throw error;
+  }
+  if (ticket.status === 'CANCELLED') {
+    const error = new Error('Registration is already cancelled');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const result = await pool.query(
+    `UPDATE tickets SET status = 'CANCELLED', cancelled_at = NOW(), updated_at = NOW()
+     WHERE ticket_id = $1 AND status = 'VALID'
+     RETURNING *`,
+    [ticketId]
+  );
+
+  if (result.rows.length === 0) {
+    const error = new Error('Unable to cancel registration');
+    error.statusCode = 500;
+    throw error;
+  }
+
+  return result.rows[0];
+}
+
+/**
+ * Deletes a ticket (soft-delete via cancellation is preferred).
  */
 async function deleteTicket(ticketId) {
   const result = await pool.query(
@@ -166,18 +224,22 @@ async function regeneratePDF(ticketId) {
   const pdfBuffer = await generatePDF(ticket, qrBuffer);
 
   const updated = await pool.query(
-    `UPDATE tickets SET pdf_data = $1 WHERE ticket_id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at, pdf_data`,
+    `UPDATE tickets SET pdf_data = $1, updated_at = NOW()
+     WHERE ticket_id = $2
+     RETURNING id, ticket_id, qr_token, name, gender, email, mobile,
+               status, scanned_by, scanned_at, created_at, updated_at, pdf_data`,
     [pdfBuffer, ticketId]
   );
   return updated.rows[0];
 }
 
 /**
- * Gets dashboard stats.
+ * Gets dashboard stats including cancelled count.
  */
 async function getDashboardStats() {
   const totalResult = await pool.query('SELECT COUNT(*) FROM tickets');
   const usedResult = await pool.query("SELECT COUNT(*) FROM tickets WHERE status = 'USED'");
+  const cancelledResult = await pool.query("SELECT COUNT(*) FROM tickets WHERE status = 'CANCELLED'");
   const todayScannedResult = await pool.query(
     "SELECT COUNT(*) FROM tickets WHERE DATE(scanned_at) = CURRENT_DATE"
   );
@@ -194,7 +256,8 @@ async function getDashboardStats() {
   return {
     total: parseInt(totalResult.rows[0].count, 10),
     used: parseInt(usedResult.rows[0].count, 10),
-    remaining: parseInt(totalResult.rows[0].count, 10) - parseInt(usedResult.rows[0].count, 10),
+    cancelled: parseInt(cancelledResult.rows[0].count, 10),
+    remaining: parseInt(totalResult.rows[0].count, 10) - parseInt(usedResult.rows[0].count, 10) - parseInt(cancelledResult.rows[0].count, 10),
     todayScanned: parseInt(todayScannedResult.rows[0].count, 10),
     latestScan: latestScanResult.rows[0] || null,
     lastGenerated: lastGeneratedResult.rows[0] || null,
@@ -234,6 +297,7 @@ module.exports = {
   getTicketByTicketId,
   verifyAndApprove,
   useTicket,
+  cancelTicket,
   deleteTicket,
   regeneratePDF,
   getDashboardStats,
