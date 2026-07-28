@@ -93,74 +93,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ── Ensure Chrome is installed for Puppeteer PDF generation ──
-// Render's cached node_modules often skip postinstall, so we check at startup.
-// Runs in the background so the server can start immediately (non-blocking).
-const { exec } = require('child_process');
-const fs = require('fs');
-
-/**
- * Installs Chrome in the background if it's not already available.
- * Runs asynchronously after server start so it doesn't block.
- */
-async function ensureChromeInstalled() {
-  try {
-    const puppeteer = require('puppeteer');
-    const chromePath = await puppeteer.executablePath();
-    if (chromePath && fs.existsSync(chromePath)) {
-      return; // Already installed
-    }
-  } catch (_) {}
-
-  console.log('⏳ Installing Chrome for Puppeteer (background)...');
-  exec('npx --yes puppeteer browsers install chrome', {
-    timeout: 300000,
-  }, (err) => {
-    if (err) {
-      console.error('❌ Chrome install failed:', err.message);
-      return;
-    }
-    console.log('✓ Chrome installed');
-  });
-}
-
-/**
- * Ensures Chrome binary has execute permissions.
- * Blocks server startup until done (critical for fixing EACCES before first request).
- */
-async function ensureChromePermissions() {
-  try {
-    const puppeteer = require('puppeteer');
-    const chromePath = await puppeteer.executablePath();
-    if (!chromePath || !fs.existsSync(chromePath)) {
-      console.log('⚠ Chrome not installed yet — PDF generation will need background install');
-      return;
-    }
-    // Check if executable — if not, fix it synchronously
-    try {
-      fs.accessSync(chromePath, fs.constants.X_OK);
-      console.log('✓ Chrome ready');
-    } catch (_) {
-      console.log('⚠ Chrome not executable — fixing permissions...');
-      fs.chmodSync(chromePath, 0o755);
-      console.log('✓ Chrome permissions fixed');
-    }
-  } catch (e) {
-    console.log('⚠ Could not verify Chrome:', e.message);
-  }
-}
-
-// ── Initialize DB → Fix Chrome → Start Server ──
+// ── Initialize DB → Start Server ──
 createTables()
-  .then(async () => {
-    // Fix Chrome permission BEFORE any requests arrive (synchronous after await)
-    await ensureChromePermissions();
-    // Start server
+  .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
-    // Install in background if Chrome is still missing
-    ensureChromeInstalled();
   })
   .catch((err) => {
     console.error('Failed to initialize:', err);

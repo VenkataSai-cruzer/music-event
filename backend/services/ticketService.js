@@ -2,7 +2,7 @@ const pool = require('../db/db');
 const { v4: uuidv4 } = require('uuid');
 const generateTicketId = require('../utils/generateTicketId');
 const generateQR = require('../utils/generateQR');
-const generatePDF = require('../utils/generatePuppeteerPDF');
+const generatePDF = require('../utils/generatePDF');
 
 /**
  * Creates a new ticket with QR (in-memory) and PDF generation.
