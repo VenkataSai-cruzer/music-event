@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Download, Eye, RefreshCw, Ban, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Download, Eye, RefreshCw, Ban, Trash2, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ticketService } from '../services/ticketService';
 import Modal from '../components/Modal';
@@ -15,6 +15,7 @@ export default function Tickets() {
   const [deleting, setDeleting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState(null);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -98,6 +99,26 @@ export default function Tickets() {
     }
   };
 
+  const handleExportCSV = async () => {
+    setExportingCSV(true);
+    try {
+      const res = await ticketService.exportCSV();
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `registrations-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('CSV exported successfully');
+    } catch (err) {
+      toast.error('Failed to export CSV');
+    } finally {
+      setExportingCSV(false);
+    }
+  };
+
   const handleCancel = async () => {
     if (!cancelTarget) return;
     setCancelling(true);
@@ -145,6 +166,14 @@ export default function Tickets() {
           <h1 className="text-2xl font-bold text-gray-900">Registrations</h1>
           <p className="text-gray-500 mt-1">{data.pagination.total} total registrations</p>
         </div>
+        <button
+          onClick={handleExportCSV}
+          disabled={exportingCSV}
+          className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-green-600" />
+          {exportingCSV ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       {/* Search */}

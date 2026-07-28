@@ -45,6 +45,40 @@ const createTables = async () => {
       console.log('Seeded 3 default scanner accounts (gate_a, gate_b, vip / password: scan123)');
     }
 
+    // ── Create event_settings table ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS event_settings (
+        id            SERIAL PRIMARY KEY,
+        event_name    VARCHAR(255) NOT NULL DEFAULT '7 NOTES \u2013 Live Jamming Session',
+        event_date    VARCHAR(100) NOT NULL DEFAULT '08 August 2026, Saturday',
+        event_time    VARCHAR(100) NOT NULL DEFAULT '5:30 PM \u2013 9:00 PM',
+        venue         VARCHAR(255) NOT NULL DEFAULT 'CAFOOZE',
+        address       TEXT NOT NULL DEFAULT 'Plot No. 7, Engineers Enclave, Y Junction, VT Agraharam, Vizianagaram, Andhra Pradesh',
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // Seed default event settings if empty
+    const settingsCount = await pool.query('SELECT COUNT(*) FROM event_settings');
+    if (parseInt(settingsCount.rows[0].count, 10) === 0) {
+      await pool.query(`INSERT INTO event_settings (event_name, event_date, event_time, venue, address) VALUES (DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT);`);
+      console.log('Seeded default event settings');
+    }
+
+    // ── Create activity_log table ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id            SERIAL PRIMARY KEY,
+        action        VARCHAR(100) NOT NULL,
+        description   TEXT,
+        ticket_id     VARCHAR(50),
+        performed_by  VARCHAR(100),
+        result        VARCHAR(50),
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log (created_at DESC);`);
+
     // ── Migration: clean up old schema and stale data ──
     try {
       // Phase 1: Drop old columns from previous schema if they still exist
@@ -72,20 +106,23 @@ const createTables = async () => {
         console.log('Migration: added pdf_data BYTEA column');
       }
 
-      // Phase 2: Clear old ticket data — only if old tables still exist (truly once-only)
-      // Using activity_log/event_settings existence as marker means:
-      //   - Old database: tables exist → DELETE tickets + drop tables → done
-      //   - Fresh database: tables never existed → skip → safe
-      //   - Post-migration restart: tables already dropped → skip → live tickets safe
-      const oldTables = await pool.query(`
-        SELECT table_name FROM information_schema.tables
-        WHERE table_name IN ('activity_log', 'event_settings')
-        LIMIT 1
+      // Phase 2: Clear old ticket data — only if BOTH old-style activity_log AND the old
+      // event_settings structures exist from the PREVIOUS schema (pre-PDFKit era).
+      // Check for a column that existed ONLY in the old activity_log, not our new one.
+      const oldActivityLog = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'activity_log' AND column_name = 'action_details'
       `);
-      if (oldTables.rows.length > 0) {
+      const oldEventSettings = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'event_settings' AND column_name = 'last_login_at'
+      `);
+      if (oldActivityLog.rows.length > 0 || oldEventSettings.rows.length > 0) {
         const countRes = await pool.query('SELECT COUNT(*) FROM tickets');
-        await pool.query(`DELETE FROM tickets;`);
-        console.log('Migration: cleared ' + countRes.rows[0].count + ' stale ticket(s) from old schema');
+        if (parseInt(countRes.rows[0].count, 10) > 0) {
+          await pool.query(`DELETE FROM tickets;`);
+          console.log('Migration: cleared ' + countRes.rows[0].count + ' stale ticket(s) from old schema');
+        }
       }
     } catch (migrateErr) {
       console.log('Migration note:', migrateErr.message);
@@ -142,10 +179,6 @@ const createTables = async () => {
     } catch (migrateErr) {
       console.log('Migration note (Phase 3):', migrateErr.message);
     }
-
-    // Drop unused tables from old schema
-    await pool.query(`DROP TABLE IF EXISTS activity_log;`);
-    await pool.query(`DROP TABLE IF EXISTS event_settings;`);
 
     console.log('Database tables initialized successfully');
   } catch (err) {

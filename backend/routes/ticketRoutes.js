@@ -5,6 +5,7 @@ const {
   createTicket, getAllTickets, getDashboard,
   downloadTicket, previewTicket, regenerateTicketPDF,
   cancelTicket, useTicket, deleteTicket, getScanLogs,
+  exportCSV, getEventSettings, updateEventSettings,
 } = require('../controllers/ticketController');
 
 const { requireAdmin } = require('../middleware/auth');
@@ -12,6 +13,9 @@ const { requireAdmin } = require('../middleware/auth');
 // ── PROTECTED ROUTES (admin only) ──
 router.get('/dashboard', requireAdmin, getDashboard);
 router.get('/scan-logs', requireAdmin, getScanLogs);
+router.get('/export/csv', requireAdmin, exportCSV);
+router.get('/event-settings', requireAdmin, getEventSettings);
+router.put('/event-settings', requireAdmin, updateEventSettings);
 router.post('/', requireAdmin, createTicket);
 router.get('/', requireAdmin, getAllTickets);
 router.put('/use/:ticketId', requireAdmin, useTicket);

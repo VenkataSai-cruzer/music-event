@@ -21,6 +21,9 @@ export const ticketService = {
   cancel: (ticketId) =>
     api.patch(`/tickets/${ticketId}/cancel`),
 
+  exportCSV: () =>
+    api.get('/tickets/export/csv', { responseType: 'blob' }),
+
   verify: (qrToken, scannedBy) =>
     api.post('/tickets/verify', { qr_token: qrToken, scanned_by: scannedBy }),
 
@@ -29,4 +32,8 @@ export const ticketService = {
   delete: (ticketId) => api.delete(`/tickets/${ticketId}`),
 
   getScanLogs: (params = {}) => api.get('/tickets/scan-logs', { params }),
+
+  getEventSettings: () => api.get('/tickets/event-settings'),
+
+  updateEventSettings: (data) => api.put('/tickets/event-settings', data),
 };

@@ -1,4 +1,5 @@
 const ticketService = require('../services/ticketService');
+const pool = require('../db/db');
 
 /**
  * POST /api/tickets
@@ -316,4 +317,58 @@ async function getScanLogs(req, res, next) {
   }
 }
 
-module.exports = { createTicket, getAllTickets, getDashboard, downloadTicket, previewTicket, regenerateTicketPDF, verifyTicket, cancelTicket, useTicket, deleteTicket, getScanLogs };
+/**
+ * GET /api/tickets/export/csv
+ * Exports all registrations as a CSV file.
+ */
+async function exportCSV(req, res, next) {
+  try {
+    const csvData = await ticketService.exportCSV();
+    const filename = `registrations-${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvData);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/tickets/event-settings
+ * Returns current event settings.
+ */
+async function getEventSettings(req, res, next) {
+  try {
+    const settings = await ticketService.getEventSettings();
+    return res.json({ success: true, data: settings });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PUT /api/tickets/event-settings
+ * Updates event settings.
+ */
+async function updateEventSettings(req, res, next) {
+  try {
+    const { event_name, event_date, event_time, venue, address } = req.body;
+    await pool.query(
+      `UPDATE event_settings SET
+        event_name = COALESCE($1, event_name),
+        event_date = COALESCE($2, event_date),
+        event_time = COALESCE($3, event_time),
+        venue = COALESCE($4, venue),
+        address = COALESCE($5, address),
+        updated_at = NOW()
+       WHERE id = 1`,
+      [event_name || null, event_date || null, event_time || null, venue || null, address || null]
+    );
+    const updated = await ticketService.getEventSettings();
+    return res.json({ success: true, message: 'Event settings updated.', data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { createTicket, getAllTickets, getDashboard, downloadTicket, previewTicket, regenerateTicketPDF, verifyTicket, cancelTicket, useTicket, deleteTicket, getScanLogs, exportCSV, getEventSettings, updateEventSettings };

@@ -26,7 +26,14 @@ const FONT_B = path.join(fontDir, 'Bold', 'OpenSans-Bold.ttf');
 const fs = require('fs');
 const hasFont = fs.existsSync(FONT_R);
 
-async function generatePDF(ticket, qrBuffer) {
+async function generatePDF(ticket, qrBuffer, eventSettings) {
+  // Use dynamic event settings from database, fall back to defaults
+  const ev = eventSettings || {};
+  const eventName = ev.event_name || '7 NOTES \u2013 Live Jamming Session';
+  const eventDate = ev.event_date || '08 August 2026, Saturday';
+  const eventTime = ev.event_time || '5:30 PM \u2013 9:00 PM';
+  const eventVenue = ev.venue || 'CAFOOZE';
+  const eventAddress = ev.address || 'Plot No. 7, Engineers Enclave, Y Junction, VT Agraharam, Vizianagaram, Andhra Pradesh';
   return new Promise((resolve, reject) => {
     try {
       const now = new Date();
@@ -86,11 +93,11 @@ async function generatePDF(ticket, qrBuffer) {
       // ── MAIN CARD: Event Info + QR ──
       // Measure card content first
       const evFields = [
-        { l: 'Event', v: '7 NOTES \u2013 Live Jamming Session', big: true },
-        { l: 'Date', v: '08 August 2026, Saturday' },
-        { l: 'Time', v: '5:30 PM \u2013 9:00 PM' },
-        { l: 'Venue', v: 'CAFOOZE' },
-        { l: 'Address', v: 'Plot No. 7, Engineers Enclave, Y Junction, VT Agraharam, Vizianagaram, Andhra Pradesh' },
+        { l: 'Event', v: eventName, big: true },
+        { l: 'Date', v: eventDate },
+        { l: 'Time', v: eventTime },
+        { l: 'Venue', v: eventVenue },
+        { l: 'Address', v: eventAddress },
       ];
 
       const leftW = CW * 0.58;
