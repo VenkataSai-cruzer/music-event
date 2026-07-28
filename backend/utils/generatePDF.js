@@ -40,6 +40,14 @@ async function generatePDF(ticket, qrBuffer, eventSettings) {
       const ds = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
       const ts = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+      // Format exact registration date/time from the database record
+      const regDate = ticket.created_at
+        ? new Date(ticket.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : ds;
+      const regTime = ticket.created_at
+        ? new Date(ticket.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+        : ts;
+
       // Reuse QR — already generated with UUID by the caller
 
       // ── Render ──
@@ -169,7 +177,7 @@ async function generatePDF(ticket, qrBuffer, eventSettings) {
         ],
         [
           { l: 'Ticket ID', v: ticket.ticket_id || '' },
-          { l: 'Registration Date', v: ds + ', ' + ts },
+          { l: 'Registration Date', v: regDate + ', ' + regTime },
         ],
       ];
 

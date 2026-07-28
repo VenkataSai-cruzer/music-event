@@ -206,7 +206,7 @@ export default function Tickets() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Phone</th>
                     <th className="text-center px-4 py-3 font-medium text-gray-600">Status</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Created</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 hidden lg:table-cell">Registered At</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
                   </tr>
                 </thead>
@@ -220,7 +220,7 @@ export default function Tickets() {
                         <span className={statusBadge(ticket.status)}>{ticket.status}</span>
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">
-                        {new Date(ticket.created_at).toLocaleDateString()}
+                        {new Date(ticket.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">

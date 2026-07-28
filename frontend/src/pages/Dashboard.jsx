@@ -81,7 +81,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>Gate: {stats.latestScan.scanned_by || '—'}</span>
-                <span>{new Date(stats.latestScan.scanned_at).toLocaleTimeString()}</span>
+                <span>{new Date(stats.latestScan.scanned_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
               </div>
               <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                 Approved
@@ -106,7 +106,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <span>Status: Generated</span>
-                <span>{new Date(stats.lastGenerated.created_at).toLocaleTimeString()}</span>
+                <span>{new Date(stats.lastGenerated.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
               </div>
               <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
                 Generated
