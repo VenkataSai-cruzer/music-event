@@ -33,7 +33,7 @@ async function createTicket(ticketData) {
 
     // Store the PDF buffer directly in the database
     const updated = await pool.query(
-      `UPDATE tickets SET pdf_data = $1 WHERE id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at`,
+      `UPDATE tickets SET pdf_data = $1 WHERE id = $2 RETURNING id, ticket_id, qr_token, name, gender, email, mobile, status, scanned_by, scanned_at, created_at, pdf_data`,
       [pdfBuffer, ticket.id]
     );
 

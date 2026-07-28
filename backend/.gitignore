@@ -10,3 +10,5 @@ temp/
 !public/qrcodes/.gitkeep
 !public/logos/.gitkeep
 nul
+debug-output/
+_ticket_*.html
