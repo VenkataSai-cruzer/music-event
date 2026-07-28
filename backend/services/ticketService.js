@@ -38,7 +38,18 @@ async function getEventSettings() {
  * Flow: BEGIN → INSERT → COMMIT (DB is source of truth) → generate PDF → UPDATE pdf_data
  */
 async function createTicket(ticketData) {
-  const { name, gender, email, mobile } = ticketData;
+  const { name, gender, email, mobile, clientRequestId } = ticketData;
+
+  // ── Idempotency: if client_request_id provided, return existing ticket ──
+  if (clientRequestId) {
+    const existing = await pool.query(
+      'SELECT * FROM tickets WHERE client_request_id = $1', [clientRequestId]
+    );
+    if (existing.rows.length > 0) {
+      return existing.rows[0];
+    }
+  }
+
   const qrToken = uuidv4();
   const ticketId = await generateTicketId();
 
@@ -48,20 +59,37 @@ async function createTicket(ticketData) {
   // Step 1: Transaction — ensure DB is the source of truth
   // Uses pool.connect() to keep BEGIN/INSERT/COMMIT on the same connection
   let ticket;
-  const client = await pool.connect();
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (connErr) {
+    throw new Error('Unable to connect to database. Please try again.');
+  }
   try {
     await client.query('BEGIN');
+
+    // Use ON CONFLICT DO NOTHING for idempotency safety at DB level
     const result = await client.query(
-      `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'VALID')
+      `INSERT INTO tickets (ticket_id, qr_token, name, gender, email, mobile, status, client_request_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'VALID', $7)
+       ON CONFLICT (client_request_id) DO NOTHING
        RETURNING *`,
-      [ticketId, qrToken, name, gender, email, mobile]
+      [ticketId, qrToken, name, gender, email, mobile, clientRequestId || null]
     );
+
     await client.query('COMMIT');
     ticket = result.rows[0];
+
+    // If ON CONFLICT caused no insert (duplicate client_request_id), fetch existing
+    if (!ticket && clientRequestId) {
+      const existing = await client.query(
+        'SELECT * FROM tickets WHERE client_request_id = $1', [clientRequestId]
+      );
+      ticket = existing.rows[0];
+    }
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    throw err;
+    throw new Error('Failed to create registration. Please try again.');
   } finally {
     client.release();
   }

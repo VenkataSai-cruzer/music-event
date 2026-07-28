@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { TicketPlus, ArrowLeft, Download, Eye, CheckCircle } from 'lucide-react';
+import { TicketPlus, ArrowLeft, Download, Eye, CheckCircle, RefreshCw } from 'lucide-react';
 import { ticketService } from '../services/ticketService';
 
 export default function CreateTicket() {
@@ -12,6 +12,11 @@ export default function CreateTicket() {
   const [downloading, setDownloading] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [downloadStarted, setDownloadStarted] = useState(false);
+  const [pdfFailed, setPdfFailed] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  // Idempotency key — generated once per form session (using browser crypto)
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -68,30 +73,66 @@ export default function CreateTicket() {
   };
 
   const onSubmit = async (data) => {
+    if (submitting) return; // Prevent double submission
     setSubmitting(true);
-    try {
-      const res = await ticketService.create(data);
-      const ticket = res.data.data;
-      setCreatedTicket(ticket);
-      toast.success(`Registration ${ticket.ticketId} created!`);
+    setPdfFailed(false);
 
-      // Auto-download PDF only if generation succeeded
-      if (ticket.hasPdf) {
-        await doDownload(ticket.ticketId);
-      } else {
+    // Attach idempotency key to prevent duplicate registrations
+    const payload = { ...data, clientRequestId: idempotencyKeyRef.current };
+
+    try {
+      const res = await ticketService.create(payload);
+      const ticket = res.data.data || res.data;
+
+      setCreatedTicket(ticket);
+
+      if (res.data.success === false && ticket) {
+        // Registration exists but PDF failed
+        setPdfFailed(true);
         setDownloadStarted(true);
-        toast('PDF is being generated — click Download to retrieve it', { icon: '⏳' });
+        toast.success(`Registration ${ticket.ticketId || ticket.ticket_id} created!`);
+        toast('PDF generation failed — click Regenerate to create it', { icon: '⚠️' });
+      } else {
+        toast.success(`Registration ${ticket.ticketId} created!`);
+
+        // Auto-download PDF if generation succeeded
+        if (ticket.hasPdf || ticket.pdf_data) {
+          await doDownload(ticket.ticketId);
+        } else {
+          setDownloadStarted(true);
+          toast('PDF is being generated — use Download to retrieve it', { icon: '⏳' });
+        }
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create registration');
+      const msg = err.response?.data?.message || 'Failed to create registration';
+      toast.error(msg);
+      // Keep form data — user can retry
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!createdTicket) return;
+    setRegenerating(true);
+    try {
+      const ticketId = createdTicket.ticketId || createdTicket.ticket_id;
+      await ticketService.regeneratePDF(ticketId);
+      toast.success('PDF regenerated successfully');
+      setPdfFailed(false);
+      await doDownload(ticketId);
+    } catch (err) {
+      toast.error('Failed to regenerate PDF');
+    } finally {
+      setRegenerating(false);
     }
   };
 
   const createAnother = () => {
     setCreatedTicket(null);
     setDownloadStarted(false);
+    setPdfFailed(false);
+    idempotencyKeyRef.current = crypto.randomUUID(); // New key for next form session
     reset();
   };
 

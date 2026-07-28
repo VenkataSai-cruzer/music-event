@@ -45,6 +45,16 @@ const createTables = async () => {
       console.log('Seeded 3 default scanner accounts (gate_a, gate_b, vip / password: scan123)');
     }
 
+    // ── Add client_request_id column for idempotency ──
+    const criCol = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'tickets' AND column_name = 'client_request_id'
+    `);
+    if (criCol.rows.length === 0) {
+      await pool.query(`ALTER TABLE tickets ADD COLUMN client_request_id UUID UNIQUE;`);
+      console.log('Migration: added client_request_id column');
+    }
+
     // ── Create event_settings table ──
     await pool.query(`
       CREATE TABLE IF NOT EXISTS event_settings (

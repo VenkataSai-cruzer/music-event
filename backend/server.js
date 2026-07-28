@@ -89,7 +89,9 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(err.statusCode || 500).json({
-    error: err.message || 'Internal server error',
+    success: false,
+    message: err.message || 'An unexpected error occurred. Please try again.',
+    code: 'INTERNAL_ERROR',
   });
 });
 
