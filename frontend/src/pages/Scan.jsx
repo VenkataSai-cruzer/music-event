@@ -167,10 +167,10 @@ export default function Scan() {
       setResult(res.data);
     } catch (err) {
       if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-        setResult({ valid: false, action: 'network_error', error: 'Unable to reach server. Check connection.' });
+        setResult({ success: false, action: 'network_error', error: 'Unable to reach server. Check connection.' });
         playSound('error');
       } else {
-        setResult({ valid: false, action: 'invalid', error: 'Invalid QR code' });
+        setResult({ success: false, action: 'invalid', error: 'Invalid QR code' });
         playSound('error');
       }
     } finally {
@@ -329,23 +329,30 @@ export default function Scan() {
 
   return (
     <ScanErrorBoundary>
-      {/* ═══════════════════════════════════ */}
-      {/*  #qr-scanner ALWAYS in DOM          */}
-      {/*  Uses opacity + pointer-events so    */}
-      {/*  video frames render for detection.  */}
-      {/*  Never use display:none — it stops   */}
-      {/*  html5-qrcode frame extraction.      */}
-      {/* ═══════════════════════════════════ */}
-      <div id={QR_SCANNER_ID} style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        opacity: 0.001,
-        pointerEvents: 'none',
-        zIndex: -1,
-      }} />
+      {/* ════════════════════════════════════════════════ */}
+      {/*  QR SCANNER ELEMENT — ALWAYS IN DOM             */}
+      {/*  html5-qrcode instance stays valid across        */}
+      {/*  re-renders. Visible when scanner active,         */}
+      {/*  hidden off-screen when not.                     */}
+      {/* ════════════════════════════════════════════════ */}
+      <div
+        id={QR_SCANNER_ID}
+        style={showScanner ? {
+          position: 'fixed',
+          inset: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 30,
+        } : {
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+          pointerEvents: 'none',
+        }}
+      />
 
       {/* ═══════════════════════════════════ */}
       {/*  SCANNER LOGIN VIEW                */}
@@ -442,50 +449,64 @@ export default function Scan() {
 
       {/* ═══════════════════════════════════ */}
       {/*  MAIN SCANNER VIEW - full viewport  */}
+      {/*  Transparent background — camera feed from the     */}
+      {/*  always-in-DOM #qr-scanner sibling shows through.   */}
+      {/*  Overlays (loading, corners, processing) render     */}
+      {/*  on top of the camera feed.                         */}
       {/* ═══════════════════════════════════ */}
       {showScanner && (
-        <div className="fixed inset-0 z-30 flex flex-col bg-gray-950 overflow-hidden">
+        <div className="fixed inset-0 z-30 flex flex-col overflow-hidden">
           {/* Scanner Status Bar */}
           <ScannerStatusBar scannerInfo={scannerInfo} onLogout={handleLogout} />
 
-          {/* Camera Preview — fills remaining space */}
-          <div className="flex-1 relative">
-            {/* Camera-off overlay */}
+          {/* Camera Preview — fills remaining space */ }
+          <div className="flex-1 relative overflow-hidden">
+            {/* Camera-off overlay while loading */}
             {(!scanning || cameraStatus === 'loading') && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-950 z-10">
-                <div className="text-center p-8">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center p-8 bg-black/60 rounded-2xl backdrop-blur-sm">
                   {cameraStatus === 'loading' ? (
                     <>
                       <svg className="animate-spin w-12 h-12 text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      <p className="text-gray-400 text-sm">Starting camera...</p>
+                      <p className="text-gray-200 text-sm">Starting camera...</p>
                     </>
                   ) : (
                     <>
-                      <Camera className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                      <p className="text-gray-500 text-sm">Camera is off</p>
+                      <Camera className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-400 text-sm">Camera is off</p>
                     </>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Scan overlay corners */}
+            {/* QR scanning boundary box & scan line overlay */}
             {cameraStatus === 'ready' && scanning && (
               <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-8 left-8 w-14 h-14 border-t-4 border-l-4 border-indigo-400 rounded-tl-xl" />
-                <div className="absolute top-8 right-8 w-14 h-14 border-t-4 border-r-4 border-indigo-400 rounded-tr-xl" />
-                <div className="absolute bottom-8 left-8 w-14 h-14 border-b-4 border-l-4 border-indigo-400 rounded-bl-xl" />
-                <div className="absolute bottom-8 right-8 w-14 h-14 border-b-4 border-r-4 border-indigo-400 rounded-br-xl" />
-                <div className="absolute left-12 right-12 h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-scan" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64">
+                  {/* Corner borders */}
+                  <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-indigo-400 rounded-tl-xl" />
+                  <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-indigo-400 rounded-tr-xl" />
+                  <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-indigo-400 rounded-bl-xl" />
+                  <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-indigo-400 rounded-br-xl" />
+                  {/* Scanning line */}
+                  <div className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-scan" />
+                </div>
+                {/* Instruction text */}
+                <div className="absolute bottom-12 left-0 right-0 text-center">
+                  <p className="text-white/90 text-sm font-medium drop-shadow-lg">
+                    Align QR code within the frame
+                  </p>
+                </div>
               </div>
             )}
 
             {/* Processing overlay */}
             {processing && (
-              <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20">
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <div className="text-center">
                   <svg className="animate-spin w-12 h-12 text-white mx-auto mb-3" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -498,7 +519,7 @@ export default function Scan() {
           </div>
 
           {/* Bottom Controls */}
-          <div className="bg-gray-950 px-4 py-3 flex items-center justify-between border-t border-gray-800">
+          <div className="bg-black/80 px-4 py-3 flex items-center justify-between border-t border-gray-800">
             <div className="flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${
                 cameraStatus === 'ready' ? 'bg-green-400 animate-pulse' :
@@ -571,7 +592,7 @@ function ScannerStatusBar({ scannerInfo, onLogout }) {
 }
 
 function ResultRow({ label, value }) {
-  if (!value) return null;
+  if (!value && value !== 0) return null;
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-gray-500 font-medium">{label}</span>
@@ -585,8 +606,11 @@ function ScanResultOverlay({ result, getScannedBy, resumeScanner }) {
   const approved = action === 'approved';
   const used = action === 'already_used';
   const cancelled = action === 'cancelled' || resultType === 'CANCELLED';
-  const invalid = action === 'invalid';
+  const invalid = action === 'invalid' || resultType === 'INVALID';
   const networkError = action === 'network_error';
+
+  // Backend sends data in result.data (see ticketController verifyTicket)
+  const d = result.data || {};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -606,8 +630,8 @@ function ScanResultOverlay({ result, getScannedBy, resumeScanner }) {
             </div>
             <div className="p-6 space-y-3">
               <div className="bg-green-50 rounded-2xl p-4 space-y-2.5">
-                <ResultRow label="Name" value={result.ticket?.name} />
-                <ResultRow label="Ticket" value={result.ticket?.ticket_id} />
+                <ResultRow label="Name" value={d.attendeeName} />
+                <ResultRow label="Ticket" value={d.ticketId} />
                 <ResultRow label="Scanner" value={getScannedBy()} />
                 <ResultRow label="Time" value={new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
               </div>
@@ -629,12 +653,10 @@ function ScanResultOverlay({ result, getScannedBy, resumeScanner }) {
             </div>
             <div className="p-6 space-y-3">
               <div className="bg-amber-50 rounded-2xl p-4 space-y-2.5">
-                <ResultRow label="Name" value={result.ticket?.name} />
-                <ResultRow label="Ticket" value={result.ticket?.ticket_id} />
-                {result.ticket?.scanned_by && <ResultRow label="Original Scan" value={result.ticket.scanned_by} />}
-                {result.ticket?.scanned_at && (
-                  <ResultRow label="Time" value={new Date(result.ticket.scanned_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} />
-                )}
+                <ResultRow label="Name" value={d.attendeeName} />
+                <ResultRow label="Ticket" value={d.ticketId} />
+                <ResultRow label="Original Scanner" value={d.scannedBy} />
+                <ResultRow label="Scanned At" value={d.scannedAt ? new Date(d.scannedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null} />
               </div>
             </div>
           </>
