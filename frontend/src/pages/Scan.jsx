@@ -677,9 +677,6 @@ export default function Scan() {
           top: 0 !important;
           left: 0 !important;
         }
-        #qr-scanner {
-          background: #000;
-        }
       `}</style>
     </ScanErrorBoundary>
   );
