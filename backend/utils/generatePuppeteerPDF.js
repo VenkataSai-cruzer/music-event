@@ -47,11 +47,6 @@ function loadOverlaySvgCache() {
   // Also remove the XML declaration — we embed the SVG in HTML5
   content = content.replace(/<\?xml[^>]*\?>\n?/, '');
 
-  // Verify the background image exists on disk as a fallback
-  if (!fs.existsSync(BACKGROUND_PATH)) {
-    console.warn(`[PDF] Background image not found at: ${BACKGROUND_PATH}`);
-  }
-
   cachedOverlaySvg = content;
   console.log(`[PDF] Overlay SVG cached (${(cachedOverlaySvg.length / 1024).toFixed(1)} KB) — background removed`);
 }
@@ -95,9 +90,12 @@ process.on('SIGINT', () => closeBrowser());
  * Pipeline:
  *   1. Load background PNG from disk as a file:// URL (no data URI limits)
  *   2. Load SVG overlay template (placeholders replaced with ticket data)
- *   3. Compose in HTML: <img> for background, <svg> for overlays
- *   4. Load via file:// HTML page in Puppeteer (avoids CORS/data-URI limits)
- *   5. Generate exactly one PDF page
+ *   3. Compose in HTML with proper z-index stacking
+ *   4. Load via file:// HTML page in Puppeteer
+ *   5. Wait for all images to load
+ *   6. Verify composition before PDF generation
+ *   7. Take debug screenshot
+ *   8. Generate exactly one PDF page
  *
  * @param {Object} ticket - Ticket object with name, gender, email, mobile, ticket_id, qr_token.
  * @param {Buffer} qrBuffer - PNG buffer for the QR code.
@@ -131,27 +129,40 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     svgContent = svgContent.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), String(value));
   }
 
-  // ── Build HTML page ──
-  // Background loaded as <img> from local file (no data URI size limit).
-  // SVG overlays placed directly in the page (already has its own <svg> wrapper).
+  // ═══════════════════════════════════════════════════════
+  //  Build HTML page with CORRECT z-index stacking
+  //  .ticket-background (z-index: 1) — background artwork
+  //  .ticket-overlay    (z-index: 2) — SVG with text/QR/barcode
+  // ═══════════════════════════════════════════════════════
   const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      width: 1536px;
-      height: 1024px;
-      overflow: hidden;
-      background: #ffffff;
+    @page {
+      size: 6in 4in;
+      margin: 0;
     }
-    .ticket-wrapper {
+
+    html, body {
+      width: 6in;
+      height: 4in;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    .ticket {
       position: relative;
       width: 1536px;
       height: 1024px;
+      overflow: hidden;
+      transform-origin: top left;
     }
-    .ticket-wrapper img.background {
+
+    .ticket-background,
+    .ticket-overlay {
       position: absolute;
       top: 0;
       left: 0;
@@ -159,19 +170,30 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
       height: 1024px;
       display: block;
     }
-    .ticket-wrapper svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 1536px;
-      height: 1024px;
+
+    .ticket-background {
+      z-index: 1;
+    }
+
+    .ticket-overlay {
+      z-index: 2;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
-  <div class="ticket-wrapper">
-    <img class="background" src="background.png" alt="" />
-    ${svgContent}
+  <div class="ticket">
+    <img
+      class="ticket-background"
+      src="./background.png"
+      width="1536"
+      height="1024"
+      alt=""
+    />
+
+    <div class="ticket-overlay">
+      ${svgContent}
+    </div>
   </div>
 </body>
 </html>`;
@@ -184,7 +206,7 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
   const tempHtmlPath = path.join(TEMPLATES_DIR, tempHtmlName);
   fs.writeFileSync(tempHtmlPath, html, 'utf-8');
 
-  // ── Debug: write rendered SVG for manual inspection ──
+  // ── Debug: write rendered files for manual inspection ──
   const debugDir = path.join(__dirname, '..', 'debug-output');
   if (!fs.existsSync(debugDir)) {
     fs.mkdirSync(debugDir, { recursive: true });
@@ -203,31 +225,115 @@ async function generatePuppeteerPDF(ticket, qrBuffer) {
     page.setDefaultTimeout(120000);
 
     // Load from file:// URL so background.png resolves correctly via relative path
-    const fileUrl = `file:///${tempHtmlPath.split('\\').join('/')}`;
+    const fileUrl = `file:///${tempHtmlPath.split('\\\\').join('/')}`;
     await page.goto(fileUrl, {
       waitUntil: 'networkidle0',
-      timeout: 120000,
+      timeout: 60000,
     });
 
-    // Brief settle for final rendering
-    await new Promise(r => setTimeout(r, 1000));
+    // ═══════════════════════════════════════════════════
+    //  Wait for ALL images (background, QR, barcode) to load
+    // ═══════════════════════════════════════════════════
+    await page.evaluate(async () => {
+      const images = Array.from(document.images);
 
-    // Landscape, single page, zero margins, print background, scale=1
-    const pdfBuffer = await page.pdf({
-      format: undefined,
+      await Promise.all(
+        images.map((image) => {
+          if (image.complete && image.naturalWidth > 0) {
+            return Promise.resolve();
+          }
+
+          return new Promise((resolve, reject) => {
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener(
+              'error',
+              () => reject(new Error(`Failed to load image: ${image.src}`)),
+              { once: true }
+            );
+          });
+        })
+      );
+
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+    });
+
+    // ═══════════════════════════════════════════════════
+    //  Verify composition before generating PDF
+    // ═══════════════════════════════════════════════════
+    const verification = await page.evaluate(() => {
+      const background = document.querySelector('.ticket-background');
+      const overlay = document.querySelector('.ticket-overlay');
+      const svg = overlay?.querySelector('svg');
+
+      return {
+        backgroundLoaded:
+          Boolean(background) &&
+          background.complete &&
+          background.naturalWidth === 1536 &&
+          background.naturalHeight === 1024,
+
+        overlayExists: Boolean(overlay),
+        svgExists: Boolean(svg),
+
+        bodyScrollWidth: document.body.scrollWidth,
+        bodyScrollHeight: document.body.scrollHeight,
+
+        remainingPlaceholders:
+          document.documentElement.innerHTML.match(/\{\{[^}]+\}\}/g) || [],
+      };
+    });
+
+    console.log('[PDF verification]', JSON.stringify(verification));
+
+    // Throw if critical checks fail
+    if (!verification.backgroundLoaded) {
+      throw new Error(
+        `Background image verification failed: ${JSON.stringify(verification)}`
+      );
+    }
+    if (!verification.overlayExists || !verification.svgExists) {
+      throw new Error(
+        `SVG overlay missing: ${JSON.stringify(verification)}`
+      );
+    }
+    if (verification.remainingPlaceholders.length > 0) {
+      throw new Error(
+        `Unreplaced placeholders found: ${verification.remainingPlaceholders.join(', ')}`
+      );
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  Debug screenshot — inspect before PDF generation
+    // ═══════════════════════════════════════════════════
+    const debugScreenshotPath = path.join(debugDir, `${debugId}_preview.png`);
+    await page.screenshot({
+      path: debugScreenshotPath,
+      fullPage: false,
+    });
+    console.log(`[PDF] Debug screenshot saved: ${debugScreenshotPath}`);
+
+    // ═══════════════════════════════════════════════════
+    //  Generate PDF — explicit dimensions, single page
+    // ═══════════════════════════════════════════════════
+    const fileName = `${ticket.qr_token}.pdf`;
+    const filePath = path.join(TICKETS_DIR, fileName);
+
+    await page.pdf({
+      path: filePath,
       width: '6in',
       height: '4in',
-      landscape: true,
       printBackground: true,
+      preferCSSPageSize: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
-      scale: 1,
       pageRanges: '1',
     });
 
-    // Also write to disk as a fallback cache for static serving
-    const fileName = `${ticket.qr_token}.pdf`;
-    const filePath = path.join(TICKETS_DIR, fileName);
-    fs.writeFileSync(filePath, pdfBuffer);
+    // Read back the PDF buffer for DB storage
+    const pdfBuffer = fs.readFileSync(filePath);
+
+    console.log(`[PDF] Generated: ${fileName} (${(pdfBuffer.length / 1024).toFixed(0)} KB)`);
 
     return pdfBuffer;
   } finally {
