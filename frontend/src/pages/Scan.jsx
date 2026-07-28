@@ -326,6 +326,8 @@ export default function Scan() {
     <ScanErrorBoundary>
       {/* ══════════════════════════════════════════ */}
       {/*  QR SCANNER ELEMENT — ALWAYS IN DOM      */}
+      {/*  z-index 20 sits BEHIND the scanner view  */}
+      {/*  at z-index 30 so camera shows through    */}
       {/* ══════════════════════════════════════════ */}
       <div
         id={QR_SCANNER_ID}
@@ -489,9 +491,12 @@ export default function Scan() {
 
       {/* ══════════════════════════════════════════ */}
       {/*  MAIN SCANNER VIEW — Full Screen Premium  */}
+      {/*  NO background — camera feed from the      */}
+      {/*  #qr-scanner sibling (z-index 30, BEHIND)  */}
+      {/*  shows through transparent areas.           */}
       {/* ══════════════════════════════════════════ */}
       {showScanner && (
-        <div className="fixed inset-0 z-30 flex flex-col overflow-hidden bg-black">
+        <div className="fixed inset-0 z-30 flex flex-col overflow-hidden">
           {/* Top Bar — Glassmorphism */}
           <div className="relative z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent">
             <div className="flex items-center gap-2.5">
@@ -507,10 +512,10 @@ export default function Scan() {
             <div className="flex items-center gap-3">
               {/* Counter Badge */}
               {counter.total > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-full">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-xs font-medium text-white">{counter.used}</span>
-                  <span className="text-xs text-white/30">/</span>
+                  <span className="text-xs text-white/40">/</span>
                   <span className="text-xs font-medium text-white">{counter.total}</span>
                 </div>
               )}
@@ -520,20 +525,20 @@ export default function Scan() {
             </div>
           </div>
 
-          {/* Camera Area — fills remaining space */}
+          {/* Camera Area — transparent, camera feed from behind shows through */}
           <div className="flex-1 relative">
-            {/* Dark vignette overlays */}
+            {/* Dark vignette overlays for readability of UI on top */}
             <div className="absolute inset-0 pointer-events-none z-10">
-              <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-black/60 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/60 to-transparent" />
+              <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-black/50 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent" />
             </div>
 
-            {/* Loading overlay */}
+            {/* Loading overlay — only visible when camera not ready */}
             {(!scanning || cameraStatus === 'loading') && (
               <div className="absolute inset-0 flex items-center justify-center z-20">
                 <div className="text-center">
                   {cameraStatus === 'loading' ? (
-                    <div className="bg-black/50 backdrop-blur-md rounded-2xl px-8 py-6">
+                    <div className="bg-black/60 backdrop-blur-md rounded-2xl px-8 py-6">
                       <svg className="animate-spin w-10 h-10 text-indigo-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -541,7 +546,7 @@ export default function Scan() {
                       <p className="text-white/80 text-sm">Starting camera...</p>
                     </div>
                   ) : (
-                    <div className="bg-black/50 backdrop-blur-md rounded-2xl px-8 py-6">
+                    <div className="bg-black/60 backdrop-blur-md rounded-2xl px-8 py-6">
                       <Camera className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                       <p className="text-gray-400 text-sm">Camera is off</p>
                     </div>
@@ -557,20 +562,20 @@ export default function Scan() {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                   <div className="relative w-64 h-64">
                     {/* Glow behind corners */}
-                    <div className="absolute -inset-4 bg-indigo-500/10 rounded-3xl blur-2xl" />
+                    <div className="absolute -inset-4 bg-indigo-500/20 rounded-3xl blur-2xl" />
                     
                     {/* Corner pieces with glow */}
                     <div className="absolute -top-1 -left-1 w-14 h-14">
-                      <div className="absolute inset-0 border-t-[3px] border-l-[3px] border-indigo-400 rounded-tl-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                      <div className="absolute inset-0 border-t-[3px] border-l-[3px] border-indigo-400 rounded-tl-2xl shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
                     </div>
                     <div className="absolute -top-1 -right-1 w-14 h-14">
-                      <div className="absolute inset-0 border-t-[3px] border-r-[3px] border-indigo-400 rounded-tr-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                      <div className="absolute inset-0 border-t-[3px] border-r-[3px] border-indigo-400 rounded-tr-2xl shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
                     </div>
                     <div className="absolute -bottom-1 -left-1 w-14 h-14">
-                      <div className="absolute inset-0 border-b-[3px] border-l-[3px] border-indigo-400 rounded-bl-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                      <div className="absolute inset-0 border-b-[3px] border-l-[3px] border-indigo-400 rounded-bl-2xl shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
                     </div>
                     <div className="absolute -bottom-1 -right-1 w-14 h-14">
-                      <div className="absolute inset-0 border-b-[3px] border-r-[3px] border-indigo-400 rounded-br-2xl shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
+                      <div className="absolute inset-0 border-b-[3px] border-r-[3px] border-indigo-400 rounded-br-2xl shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
                     </div>
 
                     {/* Scan line */}
@@ -605,10 +610,10 @@ export default function Scan() {
           </div>
 
           {/* Bottom Controls — Glassmorphism */}
-          <div className="relative z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pt-8 pb-5">
+          <div className="relative z-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pt-8 pb-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-white/50">
+                <span className="text-xs text-white/60">
                   {cameraError && cameraError !== 'permission_denied' && cameraError !== 'no_camera' ? (
                     <span className="text-amber-400">{cameraError}</span>
                   ) : cameraStatus === 'ready' ? (
@@ -662,6 +667,18 @@ export default function Scan() {
         }
         .animate-success-pulse {
           animation: successPulse 0.4s ease-in-out 2;
+        }
+        /* Force html5-qrcode video to fill the viewport */
+        #qr-scanner video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+        }
+        #qr-scanner {
+          background: #000;
         }
       `}</style>
     </ScanErrorBoundary>
