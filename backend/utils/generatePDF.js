@@ -20,7 +20,7 @@ const TY = 40;
 // ── Font paths ──
 const fontDir = path.join(__dirname, '..', 'node_modules', 'open-sans-fonts', 'open-sans');
 const FONT_R = path.join(fontDir, 'Regular', 'OpenSans-Regular.ttf');
-const FONT_SB = path.join(fontDir, 'SemiBold', 'OpenSans-SemiBold.ttf');
+const FONT_SB = path.join(fontDir, 'Semibold', 'OpenSans-Semibold.ttf');
 const FONT_B = path.join(fontDir, 'Bold', 'OpenSans-Bold.ttf');
 
 const fs = require('fs');
@@ -204,12 +204,12 @@ async function generatePDF(ticket, qrBuffer, eventSettings) {
       ];
 
       // Measure panel height
-      let pH = 14 + 16; // heading + gap
-      doc.fontSize(8.5).font(F.r);
-      for (const r of entryRules) {
-        pH += doc.heightOfString(r, { width: CW - 32 }) + 4;
-      }
-      pH += 14;
+  doc.fontSize(8.5).font(F.r);
+  let pH = 14 + 16;
+  for (const r of entryRules) {
+    pH += doc.heightOfString(r, { width: CW - 32 }) + 4;
+  }
+  pH += 14;
 
       const panelTop = y;
       doc.save();
