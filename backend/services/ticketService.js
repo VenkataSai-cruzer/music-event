@@ -50,6 +50,23 @@ async function createTicket(ticketData) {
     }
   }
 
+  // ── Duplicate check: same email already registered ──
+  const existingAttendee = await pool.query(
+    `SELECT id, ticket_id, name, email, status FROM tickets
+     WHERE LOWER(email) = LOWER($1)`,
+    [email]
+  );
+  if (existingAttendee.rows.length > 0) {
+    const dup = existingAttendee.rows[0];
+    const error = new Error(
+      `This email is already registered (${dup.ticket_id}, ${dup.status}). Each person can register only once.`
+    );
+    error.statusCode = 409;
+    error.code = 'DUPLICATE_ATTENDEE';
+    error.existingTicket = { ticket_id: dup.ticket_id, status: dup.status };
+    throw error;
+  }
+
   const qrToken = uuidv4();
   const ticketId = await generateTicketId();
 

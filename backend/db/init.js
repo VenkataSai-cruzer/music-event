@@ -185,6 +185,17 @@ const createTables = async () => {
       const nextVal = parseInt(seqSync.rows[0].next_val, 10) || 1;
       await pool.query(`ALTER SEQUENCE ticket_id_seq RESTART WITH ${nextVal};`);
 
+      // Add UNIQUE constraint on email for DB-level duplicate protection
+      const emailUniqueCheck = await pool.query(`
+        SELECT constraint_name FROM information_schema.table_constraints
+        WHERE table_name = 'tickets' AND constraint_type = 'UNIQUE'
+        AND constraint_name = 'tickets_email_key'
+      `);
+      if (emailUniqueCheck.rows.length === 0) {
+        await pool.query(`ALTER TABLE tickets ADD CONSTRAINT tickets_email_key UNIQUE (email);`);
+        console.log('Migration: added UNIQUE constraint on email');
+      }
+
       console.log('Migration: added CANCELLED status, timestamps, and indexes');
     } catch (migrateErr) {
       console.log('Migration note (Phase 3):', migrateErr.message);
